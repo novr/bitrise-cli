@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"br/internal/api"
@@ -17,6 +18,7 @@ func init() {
 		Example: `  br build list
   br build list --limit 20 --branch main
   br build list --json status,buildNumber,branch,workflow
+  br build list --json all
   br build list --status failed`,
 		RunE: runBuildList,
 	}
@@ -24,8 +26,7 @@ func init() {
 	cmd.Flags().String("branch", "", "Filter by branch name")
 	cmd.Flags().String("workflow", "", "Filter by workflow name")
 	cmd.Flags().String("status", "", "Filter by status: success, failed, running, aborted")
-	cmd.Flags().String("json", "", "Output JSON; optionally specify comma-separated fields (e.g. status,buildNumber)")
-	cmd.Flags().Lookup("json").NoOptDefVal = "*"
+	cmd.Flags().String("json", "", "Output JSON: comma-separated fields (e.g. status,buildNumber) or 'all'")
 	buildCmd.AddCommand(cmd)
 }
 
@@ -38,6 +39,10 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 
 	// Validate input before any auth/network work.
 	statusCode, err := statusNameToCode(statusFilter)
+	if err != nil {
+		return err
+	}
+	requestedFields, err := parseJSONFields(jsonFields)
 	if err != nil {
 		return err
 	}
@@ -62,7 +67,7 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	}
 
 	if jsonFields != "" {
-		return printBuildsJSON(builds, jsonFields)
+		return printBuildsJSON(builds, requestedFields)
 	}
 	return printBuildsTable(builds, appSlug)
 }
@@ -111,28 +116,59 @@ func printBuildsTable(builds []api.Build, appSlug string) error {
 	return nil
 }
 
-func printBuildsJSON(builds []api.Build, fields string) error {
-	requested := map[string]bool{}
-	if fields != "*" && fields != "" {
-		for _, f := range strings.Split(fields, ",") {
-			requested[strings.TrimSpace(f)] = true
-		}
+func buildToFieldMap(b api.Build) map[string]interface{} {
+	return map[string]interface{}{
+		"status":          b.StatusText,
+		"buildNumber":     b.BuildNumber,
+		"branch":          b.Branch,
+		"workflow":        b.TriggeredWorkflow,
+		"slug":            b.Slug,
+		"commitMessage":   b.CommitMessage,
+		"commitHash":      b.CommitHash,
+		"triggeredAt":     b.TriggeredAt,
+		"finishedAt":      b.FinishedAt,
+		"durationSeconds": b.Duration,
 	}
+}
 
+func validBuildFields() []string {
+	keys := make([]string, 0)
+	for k := range buildToFieldMap(api.Build{}) {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// parseJSONFields validates a comma-separated --json field list against the
+// known build fields. An empty string, "*" or "all" means "all fields" (nil map).
+func parseJSONFields(fields string) (map[string]bool, error) {
+	if fields == "" || fields == "*" || fields == "all" {
+		return nil, nil
+	}
+	valid := validBuildFields()
+	validSet := map[string]bool{}
+	for _, k := range valid {
+		validSet[k] = true
+	}
+	requested := map[string]bool{}
+	for _, f := range strings.Split(fields, ",") {
+		name := strings.TrimSpace(f)
+		if name == "" {
+			continue
+		}
+		if !validSet[name] {
+			return nil, fmt.Errorf("unknown --json field %q (valid: %s)", name, strings.Join(valid, ", "))
+		}
+		requested[name] = true
+	}
+	return requested, nil
+}
+
+func printBuildsJSON(builds []api.Build, requested map[string]bool) error {
 	result := make([]map[string]interface{}, 0, len(builds))
 	for _, b := range builds {
-		all := map[string]interface{}{
-			"status":          b.StatusText,
-			"buildNumber":     b.BuildNumber,
-			"branch":          b.Branch,
-			"workflow":        b.TriggeredWorkflow,
-			"slug":            b.Slug,
-			"commitMessage":   b.CommitMessage,
-			"commitHash":      b.CommitHash,
-			"triggeredAt":     b.TriggeredAt,
-			"finishedAt":      b.FinishedAt,
-			"durationSeconds": b.Duration,
-		}
+		all := buildToFieldMap(b)
 		if len(requested) == 0 {
 			result = append(result, all)
 		} else {

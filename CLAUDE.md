@@ -54,7 +54,7 @@ internal/
 
 **Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_TOKEN` env var beats the stored config, enabling CI/script use.
 
-**`--json` flag** — follows `gh` convention: `--json` alone outputs all fields; `--json field1,field2` outputs a subset. Implemented via `NoOptDefVal = "*"` on the cobra flag. Field names are camelCase (`buildNumber`, `commitMessage`, etc.).
+**`--json` flag** — `--json field1,field2` outputs a subset; `--json all` (or `*`) outputs every field. Field names are camelCase (`buildNumber`, `commitMessage`, etc.) and validated in `parseJSONFields` — unknown names error out. Note: this is a normal string flag (no `NoOptDefVal`), so the field list must follow as a separate token (`--json status,branch`) — that is intentional, since an optional-value flag would swallow the space-separated field list as a positional arg.
 
 **`--failed-only` flag** — `cmd/build_logs.go: extractFailedStepSections` splits the raw log on Bitrise step-header lines (`| (N) step-name`) and re-emits only sections containing a non-zero `exit code` pattern. This is best-effort and depends on the Bitrise log format staying consistent.
 

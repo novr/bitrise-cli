@@ -56,7 +56,7 @@ br build list --limit 3 --json status,buildNumber,branch,workflow
 ]
 ```
 
-`--json` のみ（フィールド省略）で全フィールドを返します。
+`--json all` で全フィールドを返します。未知のフィールド名を指定するとエラーになります。
 
 ### ビルド詳細
 
@@ -124,3 +124,5 @@ br build logs 123 --failed-only
 token: <your-token>
 default_app: <app-slug>  # オプション
 ```
+
+> **セキュリティ注記**: トークンはパーミッション `0600`（本人のみ読み書き可）の平文で保存されます。`gh` などと同様、OS キーチェーンによる暗号化は行いません。共有マシンでは環境変数 `BITRISE_TOKEN` の利用を推奨します。

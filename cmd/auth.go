@@ -36,6 +36,7 @@ func init() {
 }
 
 func runAuthLogin(cmd *cobra.Command, args []string) error {
+	openPATSettingsPage()
 	fmt.Print("? Paste your Bitrise Personal Access Token: ")
 	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
