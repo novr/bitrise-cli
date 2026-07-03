@@ -30,6 +30,18 @@ func init() {
 }
 
 func runBuildList(cmd *cobra.Command, args []string) error {
+	limit, _ := cmd.Flags().GetInt("limit")
+	branch, _ := cmd.Flags().GetString("branch")
+	workflow, _ := cmd.Flags().GetString("workflow")
+	statusFilter, _ := cmd.Flags().GetString("status")
+	jsonFields, _ := cmd.Flags().GetString("json")
+
+	// Validate input before any auth/network work.
+	statusCode, err := statusNameToCode(statusFilter)
+	if err != nil {
+		return err
+	}
+
 	client, err := newAPIClient()
 	if err != nil {
 		return err
@@ -38,14 +50,6 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	limit, _ := cmd.Flags().GetInt("limit")
-	branch, _ := cmd.Flags().GetString("branch")
-	workflow, _ := cmd.Flags().GetString("workflow")
-	statusFilter, _ := cmd.Flags().GetString("status")
-	jsonFields, _ := cmd.Flags().GetString("json")
-
-	statusCode := statusNameToCode(statusFilter)
 
 	builds, err := client.ListBuilds(appSlug, api.ListBuildsParams{
 		Limit:    limit,
@@ -63,18 +67,20 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	return printBuildsTable(builds, appSlug)
 }
 
-func statusNameToCode(name string) string {
+func statusNameToCode(name string) (string, error) {
 	switch strings.ToLower(name) {
+	case "":
+		return "", nil
 	case "success":
-		return "1"
+		return "1", nil
 	case "failed", "failure":
-		return "2"
+		return "2", nil
 	case "running", "in-progress":
-		return "0"
+		return "0", nil
 	case "aborted":
-		return "4"
+		return "4", nil
 	default:
-		return ""
+		return "", fmt.Errorf("invalid --status %q (valid: success, failed, running, aborted)", name)
 	}
 }
 

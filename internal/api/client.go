@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -130,31 +132,69 @@ type ListBuildsParams struct {
 	BuildNumber int
 }
 
+// maxPerPage is the largest page size the Bitrise API accepts per request.
+const maxPerPage = 50
+
 func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error) {
-	q := url.Values{}
-	if p.Limit > 0 {
-		q.Set("limit", strconv.Itoa(p.Limit))
-	}
+	baseQuery := url.Values{}
 	if p.Branch != "" {
-		q.Set("branch", p.Branch)
+		baseQuery.Set("branch", p.Branch)
 	}
 	if p.Workflow != "" {
-		q.Set("workflow", p.Workflow)
+		baseQuery.Set("workflow", p.Workflow)
 	}
 	if p.Status != "" {
-		q.Set("status", p.Status)
+		baseQuery.Set("status", p.Status)
 	}
 	if p.BuildNumber > 0 {
-		q.Set("build_number", strconv.Itoa(p.BuildNumber))
+		baseQuery.Set("build_number", strconv.Itoa(p.BuildNumber))
 	}
-	body, err := c.do("GET", "/apps/"+appSlug+"/builds", q)
-	if err != nil {
-		return nil, err
+
+	var all []Build
+	next := ""
+	for {
+		q := url.Values{}
+		for k, v := range baseQuery {
+			q[k] = v
+		}
+		// Request only as many as still needed, capped at the API page size.
+		pageSize := maxPerPage
+		if p.Limit > 0 {
+			remaining := p.Limit - len(all)
+			if remaining < pageSize {
+				pageSize = remaining
+			}
+		}
+		q.Set("limit", strconv.Itoa(pageSize))
+		if next != "" {
+			q.Set("next", next)
+		}
+
+		body, err := c.do("GET", "/apps/"+appSlug+"/builds", q)
+		if err != nil {
+			return nil, err
+		}
+		var resp struct {
+			Data   []Build `json:"data"`
+			Paging struct {
+				Next string `json:"next"`
+			} `json:"paging"`
+		}
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, err
+		}
+		all = append(all, resp.Data...)
+
+		if p.Limit > 0 && len(all) >= p.Limit {
+			all = all[:p.Limit]
+			break
+		}
+		if resp.Paging.Next == "" || len(resp.Data) == 0 {
+			break
+		}
+		next = resp.Paging.Next
 	}
-	var resp struct {
-		Data []Build `json:"data"`
-	}
-	return resp.Data, json.Unmarshal(body, &resp)
+	return all, nil
 }
 
 func (c *Client) GetBuildByNumber(appSlug string, buildNumber int) (*Build, error) {
@@ -207,9 +247,12 @@ func (c *Client) FetchLog(buildSlug string) (string, bool, error) {
 	if len(chunks) == 0 {
 		return "", false, nil
 	}
-	var sb string
+	sort.Slice(chunks, func(i, j int) bool {
+		return chunks[i].Position < chunks[j].Position
+	})
+	var sb strings.Builder
 	for _, ch := range chunks {
-		sb += ch.Chunk
+		sb.WriteString(ch.Chunk)
 	}
-	return sb, false, nil
+	return sb.String(), false, nil
 }
