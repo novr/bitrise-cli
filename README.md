@@ -1,0 +1,126 @@
+# br — Bitrise CLI
+
+`gh` ライクな操作感で Bitrise のビルド履歴・ログにターミナルや AI アシスタント（Claude / Cursor）からシームレスにアクセスできる CLI ツール。
+
+## インストール
+
+```bash
+make install   # /usr/local/bin/br にインストール
+```
+
+または手動ビルド:
+
+```bash
+mise exec go@latest -- go build -o br .
+```
+
+## 認証
+
+Bitrise の [Personal Access Token](https://app.bitrise.io/me/profile#/security) を取得して:
+
+```bash
+br auth login
+# ? Paste your Bitrise Personal Access Token: ********************
+# ✓ Logged in as your_username (your@email.com)
+```
+
+CI 環境やスクリプトでは環境変数が優先されます:
+
+```bash
+export BITRISE_TOKEN=<your-token>
+```
+
+## 使い方
+
+### ビルド一覧
+
+カレントディレクトリの git remote から Bitrise アプリを自動検出します。
+
+```bash
+br build list
+br build list --limit 20
+br build list --branch main --status failed
+```
+
+**AI（Claude / Cursor）向け JSON 出力:**
+
+```bash
+br build list --limit 3 --json status,buildNumber,branch,workflow
+```
+
+```json
+[
+  {"status": "success", "buildNumber": 124, "branch": "main", "workflow": "primary"},
+  {"status": "failed",  "buildNumber": 123, "branch": "feature/auth", "workflow": "deploy"},
+  {"status": "running", "buildNumber": 122, "branch": "main", "workflow": "primary"}
+]
+```
+
+`--json` のみ（フィールド省略）で全フィールドを返します。
+
+### ビルド詳細
+
+```bash
+br build view 123
+# ✗ failed  #123  deploy  (branch: feature/auth)
+#   Commit:    add-login  (abc1234)
+#   Triggered: 15m ago
+#   Duration:  5m32s
+#
+#   ✗ Step failed: run-xcode-tests@2.4.1 (exit code: 1)
+#
+#   To see full logs:   br build logs 123
+#   To see errors only: br build logs 123 --failed-only
+```
+
+### ログ確認
+
+```bash
+br build logs 123               # フルログを出力
+br build logs 123 --failed-only # 失敗したステップのログだけ出力
+```
+
+`--failed-only` は Claude / Cursor に「このログを元にコードを修正して」と渡す際に特に有効です。
+
+### アプリ一覧
+
+```bash
+br app list
+```
+
+## フラグ共通オプション
+
+| フラグ | 説明 |
+|--------|------|
+| `--app <slug>` | Bitrise アプリスラグを直接指定（自動検出を上書き） |
+| `BITRISE_APP_SLUG` | 環境変数でアプリを指定 |
+
+## アプリの自動検出
+
+`br build` 系コマンドは以下の優先順位でアプリを特定します:
+
+1. `--app` フラグ
+2. `BITRISE_APP_SLUG` 環境変数
+3. `git remote get-url origin` → Bitrise アプリの `repo_url` と照合
+4. `~/.config/br/config.yml` の `default_app`
+
+## AI アシスタントとの連携例
+
+Claude や Cursor に次のように依頼するだけで、裏側でこの CLI が実行されます:
+
+> 「直近の Bitrise ビルドが落ちてないか確認して、落ちてたらログを解析して修正案を出して」
+
+```bash
+# Claude/Cursor が実行するコマンドの流れ
+br build list --limit 1 --json status,buildNumber
+br build logs 123 --failed-only
+```
+
+## 設定ファイル
+
+`~/.config/br/config.yml` にトークンとデフォルトアプリが保存されます。
+
+```yaml
+token: <your-token>
+default_app: <app-slug>  # オプション
+```
