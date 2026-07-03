@@ -20,8 +20,11 @@ mise exec go@latest -- go mod tidy
 # Compile-check without producing a binary
 mise exec go@latest -- go build ./...
 
-# Run tests (none yet — add under cmd/ or internal/)
+# Run all tests
 mise exec go@latest -- go test ./...
+
+# Run a single test
+mise exec go@latest -- go test ./cmd -run TestParseStatusFilter
 ```
 
 The built binary is `./br`. Run it directly: `./br build list --help`.
@@ -53,6 +56,8 @@ internal/
 4. `default_app` in `~/.config/br/config.yml`
 
 **Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_TOKEN` env var beats the stored config, enabling CI/script use.
+
+**Build status** (`internal/api: BuildStatus`) — the API's numeric status codes are a named type with constants (`StatusRunning=0 … StatusAborted=4`); never compare `build.Status` against bare ints. Status filtering is an optional `*BuildStatus` (nil = no filter), not a sentinel string.
 
 **`--json` flag** — `--json field1,field2` outputs a subset; `--json all` (or `*`) outputs every field. Field names are camelCase (`buildNumber`, `commitMessage`, etc.) and validated in `parseJSONFields` — unknown names error out. Note: this is a normal string flag (no `NoOptDefVal`), so the field list must follow as a separate token (`--json status,branch`) — that is intentional, since an optional-value flag would swallow the space-separated field list as a positional arg.
 

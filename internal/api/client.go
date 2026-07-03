@@ -12,12 +12,13 @@ import (
 	"time"
 )
 
-const baseURL = "https://api.bitrise.io/v0.1"
+const defaultBaseURL = "https://api.bitrise.io/v0.1"
 
 type Client struct {
 	token      string
 	httpClient *http.Client
 	backoff    time.Duration
+	baseURL    string
 }
 
 func NewClient(token string) *Client {
@@ -25,6 +26,7 @@ func NewClient(token string) *Client {
 		token:      token,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		backoff:    500 * time.Millisecond,
+		baseURL:    defaultBaseURL,
 	}
 }
 
@@ -40,18 +42,29 @@ type App struct {
 	RepoURL string `json:"repo_url"`
 }
 
+// BuildStatus is the Bitrise build status code (values fixed by the API).
+type BuildStatus int
+
+const (
+	StatusRunning BuildStatus = 0 // not finished
+	StatusSuccess BuildStatus = 1
+	StatusFailed  BuildStatus = 2
+	StatusError   BuildStatus = 3
+	StatusAborted BuildStatus = 4
+)
+
 type Build struct {
-	Slug              string     `json:"slug"`
-	BuildNumber       int        `json:"build_number"`
-	Branch            string     `json:"branch"`
-	CommitMessage     string     `json:"commit_message"`
-	CommitHash        string     `json:"commit_hash"`
-	TriggeredWorkflow string     `json:"triggered_workflow"`
-	Status            int        `json:"status"`
-	StatusText        string     `json:"status_text"`
-	TriggeredAt       time.Time  `json:"triggered_at"`
-	FinishedAt        *time.Time `json:"finished_at"`
-	Duration          int        `json:"duration_in_seconds"`
+	Slug              string      `json:"slug"`
+	BuildNumber       int         `json:"build_number"`
+	Branch            string      `json:"branch"`
+	CommitMessage     string      `json:"commit_message"`
+	CommitHash        string      `json:"commit_hash"`
+	TriggeredWorkflow string      `json:"triggered_workflow"`
+	Status            BuildStatus `json:"status"`
+	StatusText        string      `json:"status_text"`
+	TriggeredAt       time.Time   `json:"triggered_at"`
+	FinishedAt        *time.Time  `json:"finished_at"`
+	Duration          int         `json:"duration_in_seconds"`
 }
 
 type BuildLog struct {
@@ -66,16 +79,18 @@ type BuildLog struct {
 const maxRetries = 3
 
 func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
-	u := baseURL + path
+	u := c.baseURL + path
 	if params != nil {
 		u += "?" + params.Encode()
 	}
 
 	var lastErr error
+	var wait time.Duration // single pacing point; 0 on the first attempt
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			time.Sleep(c.backoff)
+		if wait > 0 {
+			time.Sleep(wait)
 		}
+		wait = c.backoff
 
 		req, err := http.NewRequest(method, u, nil)
 		if err != nil {
@@ -86,8 +101,7 @@ func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			// Network errors are transient; retry.
-			lastErr = err
+			lastErr = err // network errors are transient; retry
 			continue
 		}
 
@@ -98,10 +112,10 @@ func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
 			continue
 		}
 
-		// Retry on rate limiting and server errors, honoring Retry-After.
+		// Retry rate limiting and server errors; Retry-After is a lower bound.
 		if (resp.StatusCode == 429 || resp.StatusCode >= 500) && attempt < maxRetries {
-			if d := retryAfter(resp); d > 0 {
-				time.Sleep(d)
+			if d := retryAfter(resp); d > wait {
+				wait = d
 			}
 			lastErr = fmt.Errorf("API error %d", resp.StatusCode)
 			continue
@@ -168,7 +182,7 @@ type ListBuildsParams struct {
 	Limit       int
 	Branch      string
 	Workflow    string
-	Status      string
+	Status      *BuildStatus // nil means no status filter
 	BuildNumber int
 }
 
@@ -183,8 +197,8 @@ func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error)
 	if p.Workflow != "" {
 		baseQuery.Set("workflow", p.Workflow)
 	}
-	if p.Status != "" {
-		baseQuery.Set("status", p.Status)
+	if p.Status != nil {
+		baseQuery.Set("status", strconv.Itoa(int(*p.Status)))
 	}
 	if p.BuildNumber > 0 {
 		baseQuery.Set("build_number", strconv.Itoa(p.BuildNumber))
@@ -197,7 +211,6 @@ func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error)
 		for k, v := range baseQuery {
 			q[k] = v
 		}
-		// Request only as many as still needed, capped at the API page size.
 		pageSize := maxPerPage
 		if p.Limit > 0 {
 			remaining := p.Limit - len(all)

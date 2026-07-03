@@ -86,15 +86,15 @@ func normalizeGitURL(rawURL string) string {
 	return strings.TrimPrefix(u, "www.")
 }
 
-func statusIcon(status int) (icon, text string) {
+func statusIcon(status api.BuildStatus) (icon, text string) {
 	switch status {
-	case 1:
+	case api.StatusSuccess:
 		return "✓", "success"
-	case 2:
+	case api.StatusFailed:
 		return "✗", "failed"
-	case 3:
+	case api.StatusError:
 		return "✗", "error"
-	case 4:
+	case api.StatusAborted:
 		return "−", "aborted"
 	default:
 		return "⟳", "running"

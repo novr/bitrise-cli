@@ -38,7 +38,7 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	jsonFields, _ := cmd.Flags().GetString("json")
 
 	// Validate input before any auth/network work.
-	statusCode, err := statusNameToCode(statusFilter)
+	status, err := parseStatusFilter(statusFilter)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 		Limit:    limit,
 		Branch:   branch,
 		Workflow: workflow,
-		Status:   statusCode,
+		Status:   status,
 	})
 	if err != nil {
 		return err
@@ -72,21 +72,25 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	return printBuildsTable(builds, appSlug)
 }
 
-func statusNameToCode(name string) (string, error) {
+// parseStatusFilter maps a user-facing status name to a build status.
+// An empty name means no filter (nil).
+func parseStatusFilter(name string) (*api.BuildStatus, error) {
+	var s api.BuildStatus
 	switch strings.ToLower(name) {
 	case "":
-		return "", nil
+		return nil, nil
 	case "success":
-		return "1", nil
+		s = api.StatusSuccess
 	case "failed", "failure":
-		return "2", nil
+		s = api.StatusFailed
 	case "running", "in-progress":
-		return "0", nil
+		s = api.StatusRunning
 	case "aborted":
-		return "4", nil
+		s = api.StatusAborted
 	default:
-		return "", fmt.Errorf("invalid --status %q (valid: success, failed, running, aborted)", name)
+		return nil, fmt.Errorf("invalid --status %q (valid: success, failed, running, aborted)", name)
 	}
+	return &s, nil
 }
 
 func printBuildsTable(builds []api.Build, appSlug string) error {
@@ -98,7 +102,7 @@ func printBuildsTable(builds []api.Build, appSlug string) error {
 	for _, b := range builds {
 		icon, statusText := statusIcon(b.Status)
 		timeStr := ""
-		if b.Status == 0 {
+		if b.Status == api.StatusRunning {
 			timeStr = elapsed(b.TriggeredAt)
 		} else if b.FinishedAt != nil {
 			timeStr = timeAgo(*b.FinishedAt)

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"br/internal/api"
+
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +58,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 	}
 
 	// For finished failed builds, try to parse step failures from the log
-	if build.Status == 2 || build.Status == 3 {
+	if build.Status == api.StatusFailed || build.Status == api.StatusError {
 		fmt.Println()
 		logText, _, err := client.FetchLog(build.Slug)
 		if err == nil && logText != "" {
@@ -70,7 +72,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("\n  To see full logs:   br build logs %d\n", build.BuildNumber)
 		fmt.Printf("  To see errors only: br build logs %d --failed-only\n", build.BuildNumber)
-	} else if build.Status == 0 {
+	} else if build.Status == api.StatusRunning {
 		fmt.Printf("\n  Build is still running. Follow along: br build logs %d\n", build.BuildNumber)
 	}
 	return nil

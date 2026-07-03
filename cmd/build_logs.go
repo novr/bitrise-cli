@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"br/internal/api"
+
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +50,7 @@ func runBuildLogs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to fetch log: %w", err)
 	}
 	if logText == "" {
-		if build.Status == 0 {
+		if build.Status == api.StatusRunning {
 			fmt.Println("Build is still starting, no logs available yet.")
 		} else {
 			fmt.Println("No logs available.")
