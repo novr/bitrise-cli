@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"br/internal/api"
@@ -61,12 +62,19 @@ func runBuildLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	if failedOnly {
-		filtered := failedStepLog(logText)
-		if filtered == "" {
-			fmt.Println("No failed steps detected in the log.")
-		} else {
-			fmt.Print(filtered)
+		steps := parseLogSteps(logText)
+		if len(steps) == 0 {
+			// Distinguish a parse miss from a genuinely clean build so the user
+			// knows to fall back to the full log rather than trusting silence.
+			fmt.Fprintln(os.Stderr, "Could not identify build steps in this log; re-run without --failed-only for the full output.")
+			return nil
 		}
+		failed := failedSteps(steps)
+		if len(failed) == 0 {
+			fmt.Println("No failed steps detected in the log.")
+			return nil
+		}
+		fmt.Print(joinStepBodies(failed))
 		return nil
 	}
 

@@ -62,10 +62,10 @@ func failedSteps(steps []logStep) []logStep {
 	return failed
 }
 
-// failedStepLog returns the concatenated log sections of only the failed steps.
-func failedStepLog(logText string) string {
+// joinStepBodies concatenates the raw log sections of the given steps.
+func joinStepBodies(steps []logStep) string {
 	var sb strings.Builder
-	for _, s := range failedSteps(parseLogSteps(logText)) {
+	for _, s := range steps {
 		sb.WriteString(s.Body)
 		if !strings.HasSuffix(s.Body, "\n") {
 			sb.WriteByte('\n')
