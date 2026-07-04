@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"br/internal/api"
@@ -42,7 +40,7 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	requestedFields, err := parseJSONFields(jsonFields)
+	requestedFields, err := parseJSONFields(jsonFields, validBuildFields())
 	if err != nil {
 		return err
 	}
@@ -139,60 +137,13 @@ func buildToFieldMap(b api.Build) map[string]interface{} {
 }
 
 func validBuildFields() []string {
-	keys := make([]string, 0)
-	for k := range buildToFieldMap(api.Build{}) {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-// parseJSONFields validates a comma-separated --json field list against the
-// known build fields. An empty string, "*" or "all" means "all fields" (nil map).
-func parseJSONFields(fields string) (map[string]bool, error) {
-	if fields == "" || fields == "*" || fields == "all" {
-		return nil, nil
-	}
-	valid := validBuildFields()
-	validSet := map[string]bool{}
-	for _, k := range valid {
-		validSet[k] = true
-	}
-	requested := map[string]bool{}
-	for _, f := range strings.Split(fields, ",") {
-		name := strings.TrimSpace(f)
-		if name == "" {
-			continue
-		}
-		if !validSet[name] {
-			return nil, fmt.Errorf("unknown --json field %q (valid: %s)", name, strings.Join(valid, ", "))
-		}
-		requested[name] = true
-	}
-	return requested, nil
+	return sortedKeys(buildToFieldMap(api.Build{}))
 }
 
 func printBuildsJSON(builds []api.Build, requested map[string]bool) error {
-	result := make([]map[string]interface{}, 0, len(builds))
+	rows := make([]map[string]interface{}, 0, len(builds))
 	for _, b := range builds {
-		all := buildToFieldMap(b)
-		if len(requested) == 0 {
-			result = append(result, all)
-		} else {
-			row := map[string]interface{}{}
-			for k, v := range all {
-				if requested[k] {
-					row[k] = v
-				}
-			}
-			result = append(result, row)
-		}
+		rows = append(rows, buildToFieldMap(b))
 	}
-
-	out, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(out))
-	return nil
+	return printJSON(rows, requested)
 }

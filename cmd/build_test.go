@@ -81,8 +81,9 @@ func TestParseStatusFilter(t *testing.T) {
 }
 
 func TestParseJSONFields(t *testing.T) {
+	valid := validBuildFields()
 	for _, in := range []string{"", "*", "all"} {
-		got, err := parseJSONFields(in)
+		got, err := parseJSONFields(in, valid)
 		if err != nil {
 			t.Errorf("parseJSONFields(%q): unexpected error %v", in, err)
 		}
@@ -91,7 +92,7 @@ func TestParseJSONFields(t *testing.T) {
 		}
 	}
 
-	got, err := parseJSONFields("status, buildNumber ,")
+	got, err := parseJSONFields("status, buildNumber ,", valid)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestParseJSONFields(t *testing.T) {
 		t.Errorf("parseJSONFields subset = %v, want {status, buildNumber}", got)
 	}
 
-	if _, err := parseJSONFields("status,bogus"); err == nil {
+	if _, err := parseJSONFields("status,bogus", valid); err == nil {
 		t.Error("parseJSONFields with unknown field: expected error, got nil")
 	}
 }
