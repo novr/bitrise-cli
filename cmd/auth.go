@@ -14,6 +14,8 @@ import (
 	"golang.org/x/term"
 )
 
+const patSettingsURL = "https://app.bitrise.io/me/profile#/security"
+
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Manage authentication",
@@ -25,7 +27,6 @@ func init() {
 		Short: "Authenticate with Bitrise using a Personal Access Token",
 		RunE:  runAuthLogin,
 	}
-	loginCmd.Flags().Bool("no-browser", false, "Do not open the token settings page in a browser")
 	loginCmd.Flags().Bool("with-token", false, "Read the token from standard input (for pipes/CI)")
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(&cobra.Command{
@@ -53,12 +54,8 @@ func readLoginToken(cmd *cobra.Command, withToken bool) (string, error) {
 		return strings.TrimSpace(string(data)), nil
 	}
 
-	noBrowser, _ := cmd.Flags().GetBool("no-browser")
-	// Skip the browser when asked, or when stdin is not a terminal (CI, SSH)
-	// where launching a browser is pointless or impossible.
-	if !noBrowser && term.IsTerminal(int(os.Stdin.Fd())) {
-		openPATSettingsPage()
-	}
+	// Show the URL rather than opening a browser (auto-opening is intrusive).
+	fmt.Printf("Create a Personal Access Token at %s\n", patSettingsURL)
 	fmt.Print("? Paste your Bitrise Personal Access Token: ")
 	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()

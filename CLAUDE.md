@@ -44,7 +44,6 @@ cmd/                   # Cobra command definitions (one file per command group)
   build_logs.go        # br build logs <number>
   logparse.go          # shared Bitrise-log step parsing (view + logs --failed-only)
   jsonout.go           # shared --json field validation + output (build/app list)
-  browser.go           # cross-platform "open URL in browser" for auth login
   config.go            # br config show / set-default-app
   version.go           # br version
 internal/
@@ -64,7 +63,7 @@ internal/
 
 If an `origin` remote exists but matches no accessible app, this is a hard error (not a fallback to `default_app`) to avoid silently targeting the wrong app — see the `errNoGitRemote` sentinel in `cmd/build.go`.
 
-**Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_TOKEN` env var beats the stored config, enabling CI/script use.
+**Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_API_TOKEN` (or legacy `BITRISE_TOKEN`) env var beats the stored config, enabling CI/script use. Note: workspace API tokens (`bitwat_…`) cannot access `/me` or `/me/apps`, so the client uses `/apps` and validates via `Client.Verify`.
 
 **Build status** (`internal/api: BuildStatus`) — the API's numeric status codes are a named type with constants (`StatusRunning=0 … StatusAborted=4`); never compare `build.Status` against bare ints. Status filtering is an optional `*BuildStatus` (nil = no filter), not a sentinel string.
 

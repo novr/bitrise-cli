@@ -20,22 +20,21 @@ Bitrise の [Personal Access Token](https://app.bitrise.io/me/profile#/security)
 
 ```bash
 br auth login
-# Opening https://app.bitrise.io/me/profile#/security ... (端末の場合のみ)
+# Create a Personal Access Token at https://app.bitrise.io/me/profile#/security
 # ? Paste your Bitrise Personal Access Token: ********************
-# ✓ Logged in as your_username (your@email.com)
+# ✓ Logged in
 ```
 
-ブラウザを開きたくない場合は `--no-browser`。CI・スクリプトでは標準入力からトークンを渡せます:
+トークン発行ページは URL 表示のみで、ブラウザは自動では開きません。CI・スクリプトでは標準入力からトークンを渡せます:
 
 ```bash
-br auth login --no-browser
-echo "$BITRISE_TOKEN" | br auth login --with-token
+echo "$BITRISE_API_TOKEN" | br auth login --with-token
 ```
 
-環境変数を使う場合は最優先で参照されます（`br auth login` 不要）:
+環境変数を使う場合は最優先で参照されます（`br auth login` 不要）。`BITRISE_API_TOKEN`（推奨）または `BITRISE_TOKEN`:
 
 ```bash
-export BITRISE_TOKEN=<your-token>
+export BITRISE_API_TOKEN=<your-token>
 ```
 
 ## 使い方
@@ -149,4 +148,4 @@ token: <your-token>
 default_app: <app-slug>  # オプション
 ```
 
-> **セキュリティ注記**: トークンはパーミッション `0600`（本人のみ読み書き可）の平文で保存されます。`gh` などと同様、OS キーチェーンによる暗号化は行いません。共有マシンでは環境変数 `BITRISE_TOKEN` の利用を推奨します。
+> **セキュリティ注記**: トークンはパーミッション `0600`（本人のみ読み書き可）の平文で保存されます。`gh` などと同様、OS キーチェーンによる暗号化は行いません。共有マシンでは環境変数 `BITRISE_API_TOKEN` の利用を推奨します。
