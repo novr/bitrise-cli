@@ -283,6 +283,7 @@ func (c *Client) DownloadRawLog(ctx context.Context, rawURL string) (string, err
 	if err != nil {
 		return "", err
 	}
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
