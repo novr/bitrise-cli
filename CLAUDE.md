@@ -43,7 +43,10 @@ cmd/                   # Cobra command definitions (one file per command group)
   build_view.go        # br build view <number>
   build_logs.go        # br build logs <number>
   logparse.go          # shared Bitrise-log step parsing (view + logs --failed-only)
+  jsonout.go           # shared --json field validation + output (build/app list)
   browser.go           # cross-platform "open URL in browser" for auth login
+  config.go            # br config show / set-default-app
+  version.go           # br version
 internal/
   api/client.go        # Bitrise REST API client (https://api.bitrise.io/v0.1)
   config/config.go     # ~/.config/br/config.yml read/write

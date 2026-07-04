@@ -21,6 +21,11 @@ func configPath() (string, error) {
 	return filepath.Join(home, ".config", "br", "config.yml"), nil
 }
 
+// Path returns the location of the config file (for display).
+func Path() (string, error) {
+	return configPath()
+}
+
 func Load() (*Config, error) {
 	path, err := configPath()
 	if err != nil {
