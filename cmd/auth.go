@@ -57,7 +57,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	fmt.Print("Validating... ")
 	client := api.NewClient(token)
-	user, err := client.GetMe()
+	user, err := client.GetMe(cmd.Context())
 	if err != nil {
 		fmt.Println("✗")
 		return err
@@ -96,7 +96,7 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_TOKEN")
 	}
-	user, err := api.NewClient(token).GetMe()
+	user, err := api.NewClient(token).GetMe(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("token invalid: %w", err)
 	}

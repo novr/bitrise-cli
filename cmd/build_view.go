@@ -30,12 +30,13 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	appSlug, err := resolveAppSlug(cmd.Parent(), client)
+	ctx := cmd.Context()
+	appSlug, err := resolveAppSlug(ctx, cmd.Parent(), client)
 	if err != nil {
 		return err
 	}
 
-	build, err := client.GetBuildByNumber(appSlug, buildNumber)
+	build, err := client.GetBuildByNumber(ctx, appSlug, buildNumber)
 	if err != nil {
 		return err
 	}
@@ -58,7 +59,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 	// For finished failed builds, try to parse step failures from the log
 	if build.Status == api.StatusFailed || build.Status == api.StatusError {
 		fmt.Println()
-		logText, _, err := client.FetchLog(build.Slug)
+		logText, _, err := client.FetchLog(ctx, build.Slug)
 		if err == nil && logText != "" {
 			for _, s := range failedSteps(parseLogSteps(logText)) {
 				fmt.Printf("  ✗ Step failed: %s (exit code: %d)\n", s.Name, s.ExitCode)

@@ -25,7 +25,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	apps, err := client.ListApps()
+	apps, err := client.ListApps(cmd.Context())
 	if err != nil {
 		return err
 	}

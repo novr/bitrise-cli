@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -17,7 +18,7 @@ func TestDetectAppFromGitNoRemote(t *testing.T) {
 	if err := os.Chdir(t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
-	_, err := detectAppFromGit(nil)
+	_, err := detectAppFromGit(context.Background(), nil)
 	if !errors.Is(err, errNoGitRemote) {
 		t.Errorf("detectAppFromGit outside a repo = %v, want errNoGitRemote", err)
 	}

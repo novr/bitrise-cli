@@ -33,17 +33,18 @@ func runBuildLogs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	appSlug, err := resolveAppSlug(cmd.Parent(), client)
+	ctx := cmd.Context()
+	appSlug, err := resolveAppSlug(ctx, cmd.Parent(), client)
 	if err != nil {
 		return err
 	}
 
-	build, err := client.GetBuildByNumber(appSlug, buildNumber)
+	build, err := client.GetBuildByNumber(ctx, appSlug, buildNumber)
 	if err != nil {
 		return err
 	}
 
-	logText, archived, err := client.FetchLog(build.Slug)
+	logText, archived, err := client.FetchLog(ctx, build.Slug)
 	if err != nil {
 		return fmt.Errorf("failed to fetch log: %w", err)
 	}

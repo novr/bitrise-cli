@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -38,14 +39,14 @@ func newAPIClient() (*api.Client, error) {
 //  2. BITRISE_APP_SLUG environment variable
 //  3. Git remote URL matched against user's Bitrise apps
 //  4. default_app in config
-func resolveAppSlug(cmd *cobra.Command, client *api.Client) (string, error) {
+func resolveAppSlug(ctx context.Context, cmd *cobra.Command, client *api.Client) (string, error) {
 	if slug, _ := cmd.Flags().GetString("app"); slug != "" {
 		return slug, nil
 	}
 	if slug := os.Getenv("BITRISE_APP_SLUG"); slug != "" {
 		return slug, nil
 	}
-	slug, err := detectAppFromGit(client)
+	slug, err := detectAppFromGit(ctx, client)
 	if err == nil {
 		return slug, nil
 	}
@@ -66,7 +67,7 @@ func resolveAppSlug(cmd *cobra.Command, client *api.Client) (string, error) {
 // git-based app detection was skipped (as opposed to being tried and failing).
 var errNoGitRemote = errors.New("no git remote")
 
-func detectAppFromGit(client *api.Client) (string, error) {
+func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
 	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
 	if err != nil {
 		return "", errNoGitRemote
@@ -74,7 +75,7 @@ func detectAppFromGit(client *api.Client) (string, error) {
 	remoteURL := strings.TrimSpace(string(out))
 	normalized := normalizeGitURL(remoteURL)
 
-	apps, err := client.ListApps()
+	apps, err := client.ListApps(ctx)
 	if err != nil {
 		return "", err
 	}

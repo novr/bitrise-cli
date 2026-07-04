@@ -42,10 +42,14 @@ cmd/                   # Cobra command definitions (one file per command group)
   build_list.go        # br build list
   build_view.go        # br build view <number>
   build_logs.go        # br build logs <number>
+  logparse.go          # shared Bitrise-log step parsing (view + logs --failed-only)
+  browser.go           # cross-platform "open URL in browser" for auth login
 internal/
   api/client.go        # Bitrise REST API client (https://api.bitrise.io/v0.1)
   config/config.go     # ~/.config/br/config.yml read/write
 ```
+
+`Execute()` (root.go) installs a `signal.NotifyContext` and runs `ExecuteContext`; every API method takes a `context.Context` (from `cmd.Context()`) so Ctrl+C cancels in-flight requests and retry backoff.
 
 ### Key design decisions
 
@@ -63,7 +67,7 @@ If an `origin` remote exists but matches no accessible app, this is a hard error
 
 **`--json` flag** — `--json field1,field2` outputs a subset; `--json all` (or `*`) outputs every field. Field names are camelCase (`buildNumber`, `commitMessage`, etc.) and validated in `parseJSONFields` — unknown names error out. Note: this is a normal string flag (no `NoOptDefVal`), so the field list must follow as a separate token (`--json status,branch`) — that is intentional, since an optional-value flag would swallow the space-separated field list as a positional arg.
 
-**`--failed-only` flag** — `cmd/build_logs.go: extractFailedStepSections` splits the raw log on Bitrise step-header lines (`| (N) step-name`) and re-emits only sections containing a non-zero `exit code` pattern. This is best-effort and depends on the Bitrise log format staying consistent.
+**Log parsing** (`cmd/logparse.go: parseLogSteps`) — the single source of truth for both `build view` (step summary) and `build logs --failed-only`. It splits the raw log on Bitrise step-header lines (`| (N) step-name`) and records each section's exit code. This is best-effort and depends on the Bitrise log format staying consistent.
 
 **Log fetching** (`internal/api/client.go: FetchLog`) — for archived (finished) builds, the log endpoint returns an `expiring_raw_log_url`; for running builds it returns `log_chunks`. `FetchLog` handles both transparently.
 

@@ -1,12 +1,15 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newTestClient returns a client pointed at srv with retries sped up.
@@ -34,7 +37,7 @@ func TestListBuildsPagination(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	builds, err := c.ListBuilds("app-slug", ListBuildsParams{Limit: 60})
+	builds, err := c.ListBuilds(context.Background(), "app-slug", ListBuildsParams{Limit: 60})
 	if err != nil {
 		t.Fatalf("ListBuilds: %v", err)
 	}
@@ -60,7 +63,7 @@ func TestListBuildsStopsWhenNoNext(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	builds, err := c.ListBuilds("app-slug", ListBuildsParams{Limit: 100})
+	builds, err := c.ListBuilds(context.Background(), "app-slug", ListBuildsParams{Limit: 100})
 	if err != nil {
 		t.Fatalf("ListBuilds: %v", err)
 	}
@@ -85,7 +88,7 @@ func TestListAppsPagination(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	apps, err := c.ListApps()
+	apps, err := c.ListApps(context.Background())
 	if err != nil {
 		t.Fatalf("ListApps: %v", err)
 	}
@@ -109,7 +112,7 @@ func TestRetryOn503(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	user, err := c.GetMe()
+	user, err := c.GetMe(context.Background())
 	if err != nil {
 		t.Fatalf("GetMe after retries: %v", err)
 	}
@@ -121,6 +124,29 @@ func TestRetryOn503(t *testing.T) {
 	}
 }
 
+func TestContextCancellation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable) // would otherwise be retried
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	c.backoff = time.Hour // if cancellation is ignored, the retry sleep would hang
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() { _, err := c.GetMe(ctx); done <- err }()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("err = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("call did not return promptly after cancellation")
+	}
+}
+
 func TestRateLimitedExhausted(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "0")
@@ -129,7 +155,7 @@ func TestRateLimitedExhausted(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	_, err := c.GetMe()
+	_, err := c.GetMe(context.Background())
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
 	}
@@ -145,7 +171,7 @@ func TestAuthAndErrorMapping(t *testing.T) {
 		}))
 		defer srv.Close()
 		c := newTestClient(srv.URL)
-		if _, err := c.GetMe(); err == nil || !strings.Contains(err.Error(), "authentication failed") {
+		if _, err := c.GetMe(context.Background()); err == nil || !strings.Contains(err.Error(), "authentication failed") {
 			t.Errorf("err = %v, want authentication failed", err)
 		}
 	})
@@ -157,7 +183,7 @@ func TestAuthAndErrorMapping(t *testing.T) {
 		}))
 		defer srv.Close()
 		c := newTestClient(srv.URL)
-		if _, err := c.GetMe(); err == nil || !strings.Contains(err.Error(), "app not found") {
+		if _, err := c.GetMe(context.Background()); err == nil || !strings.Contains(err.Error(), "app not found") {
 			t.Errorf("err = %v, want surfaced API message", err)
 		}
 	})
@@ -177,7 +203,7 @@ func TestFetchLogChunkOrdering(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	text, archived, err := c.FetchLog("build-slug")
+	text, archived, err := c.FetchLog(context.Background(), "build-slug")
 	if err != nil {
 		t.Fatalf("FetchLog: %v", err)
 	}
@@ -197,7 +223,7 @@ func TestDownloadRawLogExpired(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	if _, err := c.DownloadRawLog(srv.URL); err == nil {
+	if _, err := c.DownloadRawLog(context.Background(), srv.URL); err == nil {
 		t.Error("expected error for 403 (expired URL), got nil")
 	}
 }
@@ -218,7 +244,7 @@ func TestFetchLogArchived(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	text, archived, err := c.FetchLog("build-slug")
+	text, archived, err := c.FetchLog(context.Background(), "build-slug")
 	if err != nil {
 		t.Fatalf("FetchLog: %v", err)
 	}

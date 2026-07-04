@@ -51,12 +51,13 @@ func runBuildList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	appSlug, err := resolveAppSlug(cmd.Parent(), client)
+	ctx := cmd.Context()
+	appSlug, err := resolveAppSlug(ctx, cmd.Parent(), client)
 	if err != nil {
 		return err
 	}
 
-	builds, err := client.ListBuilds(appSlug, api.ListBuildsParams{
+	builds, err := client.ListBuilds(ctx, appSlug, api.ListBuildsParams{
 		Limit:    limit,
 		Branch:   branch,
 		Workflow: workflow,

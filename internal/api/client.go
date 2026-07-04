@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,7 +79,7 @@ type BuildLog struct {
 
 const maxRetries = 3
 
-func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
+func (c *Client) do(ctx context.Context, method, path string, params url.Values) ([]byte, error) {
 	u := c.baseURL + path
 	if params != nil {
 		u += "?" + params.Encode()
@@ -88,11 +89,15 @@ func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
 	var wait time.Duration // single pacing point; 0 on the first attempt
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if wait > 0 {
-			time.Sleep(wait)
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		}
 		wait = c.backoff
 
-		req, err := http.NewRequest(method, u, nil)
+		req, err := http.NewRequestWithContext(ctx, method, u, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -101,6 +106,9 @@ func (c *Client) do(method, path string, params url.Values) ([]byte, error) {
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err() // cancelled; do not retry
+			}
 			lastErr = err // network errors are transient; retry
 			continue
 		}
@@ -153,8 +161,8 @@ func retryAfter(resp *http.Response) time.Duration {
 	return 0
 }
 
-func (c *Client) GetMe() (*User, error) {
-	body, err := c.do("GET", "/me", nil)
+func (c *Client) GetMe(ctx context.Context) (*User, error) {
+	body, err := c.do(ctx, "GET", "/me", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +172,8 @@ func (c *Client) GetMe() (*User, error) {
 	return &resp.Data, json.Unmarshal(body, &resp)
 }
 
-func (c *Client) ListApps() ([]App, error) {
-	return fetchPaged[App](c, "/me/apps", url.Values{"sort_by": {"last_build_at"}}, 0)
+func (c *Client) ListApps(ctx context.Context) ([]App, error) {
+	return fetchPaged[App](ctx, c, "/me/apps", url.Values{"sort_by": {"last_build_at"}}, 0)
 }
 
 type ListBuildsParams struct {
@@ -182,7 +190,7 @@ const maxPerPage = 50
 // fetchPaged GETs path following paging.next until exhausted. If limit > 0 it
 // stops once limit items are collected (capping the final page); limit <= 0
 // fetches every page.
-func fetchPaged[T any](c *Client, path string, base url.Values, limit int) ([]T, error) {
+func fetchPaged[T any](ctx context.Context, c *Client, path string, base url.Values, limit int) ([]T, error) {
 	var all []T
 	next := ""
 	for {
@@ -201,7 +209,7 @@ func fetchPaged[T any](c *Client, path string, base url.Values, limit int) ([]T,
 			q.Set("next", next)
 		}
 
-		body, err := c.do("GET", path, q)
+		body, err := c.do(ctx, "GET", path, q)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +234,7 @@ func fetchPaged[T any](c *Client, path string, base url.Values, limit int) ([]T,
 	}
 }
 
-func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error) {
+func (c *Client) ListBuilds(ctx context.Context, appSlug string, p ListBuildsParams) ([]Build, error) {
 	q := url.Values{}
 	if p.Branch != "" {
 		q.Set("branch", p.Branch)
@@ -240,11 +248,11 @@ func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error)
 	if p.BuildNumber > 0 {
 		q.Set("build_number", strconv.Itoa(p.BuildNumber))
 	}
-	return fetchPaged[Build](c, "/apps/"+appSlug+"/builds", q, p.Limit)
+	return fetchPaged[Build](ctx, c, "/apps/"+appSlug+"/builds", q, p.Limit)
 }
 
-func (c *Client) GetBuildByNumber(appSlug string, buildNumber int) (*Build, error) {
-	builds, err := c.ListBuilds(appSlug, ListBuildsParams{BuildNumber: buildNumber, Limit: 1})
+func (c *Client) GetBuildByNumber(ctx context.Context, appSlug string, buildNumber int) (*Build, error) {
+	builds, err := c.ListBuilds(ctx, appSlug, ListBuildsParams{BuildNumber: buildNumber, Limit: 1})
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +262,8 @@ func (c *Client) GetBuildByNumber(appSlug string, buildNumber int) (*Build, erro
 	return &builds[0], nil
 }
 
-func (c *Client) GetBuildLog(buildSlug string) (*BuildLog, error) {
-	body, err := c.do("GET", "/builds/"+buildSlug+"/log", nil)
+func (c *Client) GetBuildLog(ctx context.Context, buildSlug string) (*BuildLog, error) {
+	body, err := c.do(ctx, "GET", "/builds/"+buildSlug+"/log", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -263,8 +271,12 @@ func (c *Client) GetBuildLog(buildSlug string) (*BuildLog, error) {
 	return &logResp, json.Unmarshal(body, &logResp)
 }
 
-func (c *Client) DownloadRawLog(rawURL string) (string, error) {
-	resp, err := c.httpClient.Get(rawURL)
+func (c *Client) DownloadRawLog(ctx context.Context, rawURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -282,14 +294,14 @@ func (c *Client) DownloadRawLog(rawURL string) (string, error) {
 }
 
 // FetchLog returns the full log text for a build, handling both archived and in-progress builds.
-func (c *Client) FetchLog(buildSlug string) (string, bool, error) {
-	logResp, err := c.GetBuildLog(buildSlug)
+func (c *Client) FetchLog(ctx context.Context, buildSlug string) (string, bool, error) {
+	logResp, err := c.GetBuildLog(ctx, buildSlug)
 	if err != nil {
 		return "", false, err
 	}
 
 	if logResp.IsArchived && logResp.ExpiringRawLogURL != "" {
-		text, err := c.DownloadRawLog(logResp.ExpiringRawLogURL)
+		text, err := c.DownloadRawLog(ctx, logResp.ExpiringRawLogURL)
 		return text, true, err
 	}
 
