@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -44,20 +45,31 @@ func resolveAppSlug(cmd *cobra.Command, client *api.Client) (string, error) {
 	if slug := os.Getenv("BITRISE_APP_SLUG"); slug != "" {
 		return slug, nil
 	}
-	if slug, err := detectAppFromGit(client); err == nil {
+	slug, err := detectAppFromGit(client)
+	if err == nil {
 		return slug, nil
 	}
-	cfg, err := config.Load()
-	if err == nil && cfg.DefaultApp != "" {
+	// A remote that exists but matches no app is fatal: falling back to
+	// default_app here would silently target the wrong app.
+	if !errors.Is(err, errNoGitRemote) {
+		return "", err
+	}
+
+	cfg, cfgErr := config.Load()
+	if cfgErr == nil && cfg.DefaultApp != "" {
 		return cfg.DefaultApp, nil
 	}
 	return "", fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, or run from a git repo connected to Bitrise")
 }
 
+// errNoGitRemote means the working directory has no usable origin remote, so
+// git-based app detection was skipped (as opposed to being tried and failing).
+var errNoGitRemote = errors.New("no git remote")
+
 func detectAppFromGit(client *api.Client) (string, error) {
 	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
 	if err != nil {
-		return "", err
+		return "", errNoGitRemote
 	}
 	remoteURL := strings.TrimSpace(string(out))
 	normalized := normalizeGitURL(remoteURL)
@@ -71,7 +83,7 @@ func detectAppFromGit(client *api.Client) (string, error) {
 			return app.Slug, nil
 		}
 	}
-	return "", fmt.Errorf("no Bitrise app matched remote: %s", remoteURL)
+	return "", fmt.Errorf("git remote %s is not connected to any Bitrise app you can access; use --app <slug> to override", remoteURL)
 }
 
 func normalizeGitURL(rawURL string) string {

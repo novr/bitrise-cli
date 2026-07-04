@@ -72,6 +72,28 @@ func TestListBuildsStopsWhenNoNext(t *testing.T) {
 	}
 }
 
+func TestListAppsPagination(t *testing.T) {
+	page := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page++
+		body := map[string]interface{}{"data": make([]map[string]interface{}, 50)}
+		if page == 1 {
+			body["paging"] = map[string]string{"next": "p2"}
+		}
+		json.NewEncoder(w).Encode(body)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	apps, err := c.ListApps()
+	if err != nil {
+		t.Fatalf("ListApps: %v", err)
+	}
+	if len(apps) != 100 {
+		t.Errorf("got %d apps across pages, want 100", len(apps))
+	}
+}
+
 func TestRetryOn503(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +186,19 @@ func TestFetchLogChunkOrdering(t *testing.T) {
 	}
 	if text != "firstsecondthird" {
 		t.Errorf("log = %q, want %q (position order)", text, "firstsecondthird")
+	}
+}
+
+func TestDownloadRawLogExpired(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, "<html>Access Denied</html>")
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	if _, err := c.DownloadRawLog(srv.URL); err == nil {
+		t.Error("expected error for 403 (expired URL), got nil")
 	}
 }
 

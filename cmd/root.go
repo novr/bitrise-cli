@@ -8,10 +8,13 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:          "br",
-	Short:        "Bitrise CLI",
-	Long:         "Access Bitrise build history and logs from your terminal.",
-	SilenceUsage: true,
+	Use:   "br",
+	Short: "Bitrise CLI",
+	Long:  "Access Bitrise build history and logs from your terminal.",
+	// Execute() prints the error itself; silence cobra's own reporting so it
+	// isn't printed twice.
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 func Execute() {

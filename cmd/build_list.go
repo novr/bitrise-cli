@@ -25,7 +25,7 @@ func init() {
 	cmd.Flags().IntP("limit", "n", 10, "Number of builds to show")
 	cmd.Flags().String("branch", "", "Filter by branch name")
 	cmd.Flags().String("workflow", "", "Filter by workflow name")
-	cmd.Flags().String("status", "", "Filter by status: success, failed, running, aborted")
+	cmd.Flags().String("status", "", "Filter by status: success, failed, error, running, aborted")
 	cmd.Flags().String("json", "", "Output JSON: comma-separated fields (e.g. status,buildNumber) or 'all'")
 	buildCmd.AddCommand(cmd)
 }
@@ -83,12 +83,14 @@ func parseStatusFilter(name string) (*api.BuildStatus, error) {
 		s = api.StatusSuccess
 	case "failed", "failure":
 		s = api.StatusFailed
+	case "error":
+		s = api.StatusError
 	case "running", "in-progress":
 		s = api.StatusRunning
 	case "aborted":
 		s = api.StatusAborted
 	default:
-		return nil, fmt.Errorf("invalid --status %q (valid: success, failed, running, aborted)", name)
+		return nil, fmt.Errorf("invalid --status %q (valid: success, failed, error, running, aborted)", name)
 	}
 	return &s, nil
 }

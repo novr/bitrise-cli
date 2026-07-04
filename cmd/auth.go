@@ -17,11 +17,13 @@ var authCmd = &cobra.Command{
 }
 
 func init() {
-	authCmd.AddCommand(&cobra.Command{
+	loginCmd := &cobra.Command{
 		Use:   "login",
 		Short: "Authenticate with Bitrise using a Personal Access Token",
 		RunE:  runAuthLogin,
-	})
+	}
+	loginCmd.Flags().Bool("no-browser", false, "Do not open the token settings page in a browser")
+	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(&cobra.Command{
 		Use:   "logout",
 		Short: "Remove stored credentials",
@@ -36,7 +38,12 @@ func init() {
 }
 
 func runAuthLogin(cmd *cobra.Command, args []string) error {
-	openPATSettingsPage()
+	noBrowser, _ := cmd.Flags().GetBool("no-browser")
+	// Skip the browser when asked, or when stdin is not a terminal (CI, SSH,
+	// piped token) where launching a browser is pointless or impossible.
+	if !noBrowser && term.IsTerminal(int(os.Stdin.Fd())) {
+		openPATSettingsPage()
+	}
 	fmt.Print("? Paste your Bitrise Personal Access Token: ")
 	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
@@ -84,17 +91,14 @@ func runAuthLogout(cmd *cobra.Command, args []string) error {
 }
 
 func runAuthStatus(cmd *cobra.Command, args []string) error {
+	// Return errors (non-zero exit) so `br auth status && ...` is reliable in scripts.
 	token, err := config.GetToken()
 	if err != nil {
-		fmt.Println("✗ Not authenticated")
-		fmt.Println("  Run 'br auth login' or set BITRISE_TOKEN")
-		return nil
+		return fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_TOKEN")
 	}
-	client := api.NewClient(token)
-	user, err := client.GetMe()
+	user, err := api.NewClient(token).GetMe()
 	if err != nil {
-		fmt.Printf("✗ Token invalid: %v\n", err)
-		return nil
+		return fmt.Errorf("token invalid: %w", err)
 	}
 	fmt.Printf("✓ Authenticated as %s (%s)\n", user.Username, user.Email)
 	return nil

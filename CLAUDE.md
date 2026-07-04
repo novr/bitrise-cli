@@ -55,6 +55,8 @@ internal/
 3. Git remote URL matched against the user's Bitrise apps via API
 4. `default_app` in `~/.config/br/config.yml`
 
+If an `origin` remote exists but matches no accessible app, this is a hard error (not a fallback to `default_app`) to avoid silently targeting the wrong app — see the `errNoGitRemote` sentinel in `cmd/build.go`.
+
 **Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_TOKEN` env var beats the stored config, enabling CI/script use.
 
 **Build status** (`internal/api: BuildStatus`) — the API's numeric status codes are a named type with constants (`StatusRunning=0 … StatusAborted=4`); never compare `build.Status` against bare ints. Status filtering is an optional `*BuildStatus` (nil = no filter), not a sentinel string.

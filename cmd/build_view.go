@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
-	"strings"
 
 	"br/internal/api"
 
@@ -53,7 +51,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Commit:    %s%s\n", truncate(build.CommitMessage, 72), hash)
 	}
 	fmt.Printf("  Triggered: %s\n", timeAgo(build.TriggeredAt))
-	if build.Status != 0 && build.Duration > 0 {
+	if build.Status != api.StatusRunning && build.Duration > 0 {
 		fmt.Printf("  Duration:  %s\n", formatDuration(build.Duration))
 	}
 
@@ -62,12 +60,8 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 		logText, _, err := client.FetchLog(build.Slug)
 		if err == nil && logText != "" {
-			steps := parseStepResults(logText)
-			failedSteps := filterFailed(steps)
-			if len(failedSteps) > 0 {
-				for _, s := range failedSteps {
-					fmt.Printf("  ✗ Step failed: %s (exit code: %d)\n", s.Name, s.ExitCode)
-				}
+			for _, s := range failedSteps(parseLogSteps(logText)) {
+				fmt.Printf("  ✗ Step failed: %s (exit code: %d)\n", s.Name, s.ExitCode)
 			}
 		}
 		fmt.Printf("\n  To see full logs:   br build logs %d\n", build.BuildNumber)
@@ -76,50 +70,4 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\n  Build is still running. Follow along: br build logs %d\n", build.BuildNumber)
 	}
 	return nil
-}
-
-type stepResult struct {
-	Name     string
-	ExitCode int
-}
-
-var (
-	stepHeaderRe = regexp.MustCompile(`\|\s*\(\d+\)\s+(.+?)(?:\s*\|)?\s*$`)
-	exitCodeRe   = regexp.MustCompile(`(?i)exit.?code[:=\s]+(\d+)`)
-)
-
-func parseStepResults(logText string) []stepResult {
-	var results []stepResult
-	var current *stepResult
-
-	for _, line := range strings.Split(logText, "\n") {
-		if m := stepHeaderRe.FindStringSubmatch(line); m != nil {
-			if current != nil {
-				results = append(results, *current)
-			}
-			name := strings.TrimSpace(m[1])
-			current = &stepResult{Name: name}
-			continue
-		}
-		if current != nil {
-			if m := exitCodeRe.FindStringSubmatch(line); m != nil {
-				code, _ := strconv.Atoi(m[1])
-				current.ExitCode = code
-			}
-		}
-	}
-	if current != nil {
-		results = append(results, *current)
-	}
-	return results
-}
-
-func filterFailed(steps []stepResult) []stepResult {
-	var failed []stepResult
-	for _, s := range steps {
-		if s.ExitCode != 0 {
-			failed = append(failed, s)
-		}
-	}
-	return failed
 }

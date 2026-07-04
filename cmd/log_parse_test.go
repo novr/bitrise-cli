@@ -20,31 +20,31 @@ error: test failed
 Exit code: 1
 `
 
-func TestParseStepResults(t *testing.T) {
-	steps := parseStepResults(sampleLog)
+func TestParseLogSteps(t *testing.T) {
+	steps := parseLogSteps(sampleLog)
 	if len(steps) != 2 {
-		t.Fatalf("parseStepResults found %d steps, want 2: %+v", len(steps), steps)
+		t.Fatalf("parseLogSteps found %d steps, want 2: %+v", len(steps), steps)
 	}
 	if steps[0].Name != "activate-ssh-key" || steps[0].ExitCode != 0 {
-		t.Errorf("step[0] = %+v, want {activate-ssh-key, 0}", steps[0])
+		t.Errorf("step[0] = {%s, %d}, want {activate-ssh-key, 0}", steps[0].Name, steps[0].ExitCode)
 	}
 	if steps[1].Name != "run-xcode-tests@2.4.1" || steps[1].ExitCode != 1 {
-		t.Errorf("step[1] = %+v, want {run-xcode-tests@2.4.1, 1}", steps[1])
+		t.Errorf("step[1] = {%s, %d}, want {run-xcode-tests@2.4.1, 1}", steps[1].Name, steps[1].ExitCode)
 	}
 }
 
-func TestFilterFailed(t *testing.T) {
-	failed := filterFailed(parseStepResults(sampleLog))
+func TestFailedSteps(t *testing.T) {
+	failed := failedSteps(parseLogSteps(sampleLog))
 	if len(failed) != 1 {
-		t.Fatalf("filterFailed returned %d, want 1: %+v", len(failed), failed)
+		t.Fatalf("failedSteps returned %d, want 1", len(failed))
 	}
 	if failed[0].Name != "run-xcode-tests@2.4.1" || failed[0].ExitCode != 1 {
-		t.Errorf("failed[0] = %+v, want {run-xcode-tests@2.4.1, 1}", failed[0])
+		t.Errorf("failed[0] = {%s, %d}, want {run-xcode-tests@2.4.1, 1}", failed[0].Name, failed[0].ExitCode)
 	}
 }
 
-func TestExtractFailedStepSections(t *testing.T) {
-	out := extractFailedStepSections(sampleLog)
+func TestFailedStepLog(t *testing.T) {
+	out := failedStepLog(sampleLog)
 	if out == "" {
 		t.Fatal("expected failed section, got empty")
 	}
@@ -61,7 +61,7 @@ func TestExtractFailedStepSections(t *testing.T) {
 +---+
 Step succeeded
 `
-	if got := extractFailedStepSections(clean); got != "" {
+	if got := failedStepLog(clean); got != "" {
 		t.Errorf("clean log should yield empty, got:\n%s", got)
 	}
 }

@@ -165,17 +165,7 @@ func (c *Client) GetMe() (*User, error) {
 }
 
 func (c *Client) ListApps() ([]App, error) {
-	body, err := c.do("GET", "/me/apps", url.Values{
-		"limit":   {"100"},
-		"sort_by": {"last_build_at"},
-	})
-	if err != nil {
-		return nil, err
-	}
-	var resp struct {
-		Data []App `json:"data"`
-	}
-	return resp.Data, json.Unmarshal(body, &resp)
+	return fetchPaged[App](c, "/me/apps", url.Values{"sort_by": {"last_build_at"}}, 0)
 }
 
 type ListBuildsParams struct {
@@ -189,32 +179,20 @@ type ListBuildsParams struct {
 // maxPerPage is the largest page size the Bitrise API accepts per request.
 const maxPerPage = 50
 
-func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error) {
-	baseQuery := url.Values{}
-	if p.Branch != "" {
-		baseQuery.Set("branch", p.Branch)
-	}
-	if p.Workflow != "" {
-		baseQuery.Set("workflow", p.Workflow)
-	}
-	if p.Status != nil {
-		baseQuery.Set("status", strconv.Itoa(int(*p.Status)))
-	}
-	if p.BuildNumber > 0 {
-		baseQuery.Set("build_number", strconv.Itoa(p.BuildNumber))
-	}
-
-	var all []Build
+// fetchPaged GETs path following paging.next until exhausted. If limit > 0 it
+// stops once limit items are collected (capping the final page); limit <= 0
+// fetches every page.
+func fetchPaged[T any](c *Client, path string, base url.Values, limit int) ([]T, error) {
+	var all []T
 	next := ""
 	for {
 		q := url.Values{}
-		for k, v := range baseQuery {
+		for k, v := range base {
 			q[k] = v
 		}
 		pageSize := maxPerPage
-		if p.Limit > 0 {
-			remaining := p.Limit - len(all)
-			if remaining < pageSize {
+		if limit > 0 {
+			if remaining := limit - len(all); remaining < pageSize {
 				pageSize = remaining
 			}
 		}
@@ -223,12 +201,12 @@ func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error)
 			q.Set("next", next)
 		}
 
-		body, err := c.do("GET", "/apps/"+appSlug+"/builds", q)
+		body, err := c.do("GET", path, q)
 		if err != nil {
 			return nil, err
 		}
 		var resp struct {
-			Data   []Build `json:"data"`
+			Data   []T `json:"data"`
 			Paging struct {
 				Next string `json:"next"`
 			} `json:"paging"`
@@ -238,16 +216,31 @@ func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error)
 		}
 		all = append(all, resp.Data...)
 
-		if p.Limit > 0 && len(all) >= p.Limit {
-			all = all[:p.Limit]
-			break
+		if limit > 0 && len(all) >= limit {
+			return all[:limit], nil
 		}
 		if resp.Paging.Next == "" || len(resp.Data) == 0 {
-			break
+			return all, nil
 		}
 		next = resp.Paging.Next
 	}
-	return all, nil
+}
+
+func (c *Client) ListBuilds(appSlug string, p ListBuildsParams) ([]Build, error) {
+	q := url.Values{}
+	if p.Branch != "" {
+		q.Set("branch", p.Branch)
+	}
+	if p.Workflow != "" {
+		q.Set("workflow", p.Workflow)
+	}
+	if p.Status != nil {
+		q.Set("status", strconv.Itoa(int(*p.Status)))
+	}
+	if p.BuildNumber > 0 {
+		q.Set("build_number", strconv.Itoa(p.BuildNumber))
+	}
+	return fetchPaged[Build](c, "/apps/"+appSlug+"/builds", q, p.Limit)
 }
 
 func (c *Client) GetBuildByNumber(appSlug string, buildNumber int) (*Build, error) {
@@ -279,6 +272,11 @@ func (c *Client) DownloadRawLog(rawURL string) (string, error) {
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
+	}
+	// The signed URL is short-lived; a non-2xx here is typically an expired link
+	// returning an HTML error page, which must not be mistaken for log content.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("failed to download log (status %d); the log URL may have expired", resp.StatusCode)
 	}
 	return string(data), nil
 }

@@ -1,11 +1,27 @@
 package cmd
 
 import (
+	"errors"
+	"os"
 	"testing"
 	"time"
 
 	"br/internal/api"
 )
+
+// Outside a git repo, detection must return the errNoGitRemote sentinel so that
+// resolveAppSlug is allowed to fall back to default_app (rather than erroring).
+func TestDetectAppFromGitNoRemote(t *testing.T) {
+	orig, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(orig) })
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	_, err := detectAppFromGit(nil)
+	if !errors.Is(err, errNoGitRemote) {
+		t.Errorf("detectAppFromGit outside a repo = %v, want errNoGitRemote", err)
+	}
+}
 
 func TestNormalizeGitURL(t *testing.T) {
 	want := "github.com/owner/repo"
@@ -41,6 +57,7 @@ func TestParseStatusFilter(t *testing.T) {
 		{"success", api.StatusSuccess},
 		{"failed", api.StatusFailed},
 		{"failure", api.StatusFailed},
+		{"error", api.StatusError},
 		{"running", api.StatusRunning},
 		{"in-progress", api.StatusRunning},
 		{"aborted", api.StatusAborted},
