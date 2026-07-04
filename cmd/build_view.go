@@ -41,7 +41,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	icon, statusText := statusIcon(build.Status)
+	icon, statusText := statusDisplay(*build)
 	fmt.Printf("%s %s  #%d  %s  (branch: %s)\n",
 		icon, statusText, build.BuildNumber, build.TriggeredWorkflow, build.Branch)
 	if build.CommitMessage != "" {
@@ -57,7 +57,7 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 	}
 
 	// For finished failed builds, try to parse step failures from the log
-	if build.Status == api.StatusFailed || build.Status == api.StatusError {
+	if build.Status == api.StatusError {
 		fmt.Println()
 		logText, _, err := client.FetchLog(ctx, appSlug, build.Slug)
 		if err == nil && logText != "" {

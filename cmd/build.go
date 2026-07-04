@@ -130,19 +130,29 @@ func normalizeGitURL(rawURL string) string {
 	return strings.TrimPrefix(u, "www.")
 }
 
-func statusIcon(status api.BuildStatus) (icon, text string) {
-	switch status {
+// statusDisplay returns an icon plus a label. The label comes from the API's
+// status_text (authoritative) so it never drifts from the numeric code; the
+// icon is derived from the numeric status.
+func statusDisplay(b api.Build) (icon, text string) {
+	switch b.Status {
 	case api.StatusSuccess:
-		return "✓", "success"
-	case api.StatusFailed:
-		return "✗", "failed"
+		icon = "✓"
 	case api.StatusError:
-		return "✗", "error"
+		icon = "✗"
 	case api.StatusAborted:
-		return "−", "aborted"
+		icon = "−"
 	default:
-		return "⟳", "running"
+		icon = "⟳"
 	}
+	text = b.StatusText
+	if text == "" {
+		if b.Status == api.StatusRunning {
+			text = "running"
+		} else {
+			text = "unknown"
+		}
+	}
+	return icon, text
 }
 
 func timeAgo(t time.Time) string {

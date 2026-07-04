@@ -80,10 +80,8 @@ func parseStatusFilter(name string) (*api.BuildStatus, error) {
 		return nil, nil
 	case "success":
 		s = api.StatusSuccess
-	case "failed", "failure":
-		s = api.StatusFailed
-	case "error":
-		s = api.StatusError
+	case "failed", "failure", "error":
+		s = api.StatusError // Bitrise reports failed builds as status 2 = "error"
 	case "running", "in-progress":
 		s = api.StatusRunning
 	case "aborted":
@@ -101,7 +99,7 @@ func printBuildsTable(builds []api.Build, appSlug string) error {
 	}
 	fmt.Printf("Showing %d build(s)  app: %s\n\n", len(builds), appSlug)
 	for _, b := range builds {
-		icon, statusText := statusIcon(b.Status)
+		icon, statusText := statusDisplay(b)
 		timeStr := ""
 		if b.Status == api.StatusRunning {
 			timeStr = elapsed(b.TriggeredAt)

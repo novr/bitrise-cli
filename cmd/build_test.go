@@ -78,8 +78,8 @@ func TestParseStatusFilter(t *testing.T) {
 		want api.BuildStatus
 	}{
 		{"success", api.StatusSuccess},
-		{"failed", api.StatusFailed},
-		{"failure", api.StatusFailed},
+		{"failed", api.StatusError},
+		{"failure", api.StatusError},
 		{"error", api.StatusError},
 		{"running", api.StatusRunning},
 		{"in-progress", api.StatusRunning},

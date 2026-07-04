@@ -52,12 +52,13 @@ type App struct {
 // BuildStatus is the Bitrise build status code (values fixed by the API).
 type BuildStatus int
 
+// Values are fixed by the Bitrise API (verified live: status_text is
+// success/error/aborted for 1/2/3).
 const (
 	StatusRunning BuildStatus = 0 // not finished
 	StatusSuccess BuildStatus = 1
-	StatusFailed  BuildStatus = 2
-	StatusError   BuildStatus = 3
-	StatusAborted BuildStatus = 4
+	StatusError   BuildStatus = 2 // failed / errored
+	StatusAborted BuildStatus = 3
 )
 
 type Build struct {
