@@ -20,11 +20,19 @@ Bitrise の [Personal Access Token](https://app.bitrise.io/me/profile#/security)
 
 ```bash
 br auth login
+# Opening https://app.bitrise.io/me/profile#/security ... (端末の場合のみ)
 # ? Paste your Bitrise Personal Access Token: ********************
 # ✓ Logged in as your_username (your@email.com)
 ```
 
-CI 環境やスクリプトでは環境変数が優先されます:
+ブラウザを開きたくない場合は `--no-browser`。CI・スクリプトでは標準入力からトークンを渡せます:
+
+```bash
+br auth login --no-browser
+echo "$BITRISE_TOKEN" | br auth login --with-token
+```
+
+環境変数を使う場合は最優先で参照されます（`br auth login` 不要）:
 
 ```bash
 export BITRISE_TOKEN=<your-token>
@@ -39,8 +47,10 @@ export BITRISE_TOKEN=<your-token>
 ```bash
 br build list
 br build list --limit 20
-br build list --branch main --status failed
+br build list --branch main --status failed   # status: success/failed/error/running/aborted
 ```
+
+> git remote があるのに対応する Bitrise アプリが見つからない場合は、`default_app` にフォールバックせずエラーになります（誤ったアプリを参照しないため）。`--app <slug>` で明示できます。
 
 **AI（Claude / Cursor）向け JSON 出力:**
 
@@ -86,6 +96,13 @@ br build logs 123 --failed-only # 失敗したステップのログだけ出力
 
 ```bash
 br app list
+br app list --json slug,title   # フィールド: slug, title, repoURL, または all
+```
+
+### バージョン
+
+```bash
+br version
 ```
 
 ## フラグ共通オプション
