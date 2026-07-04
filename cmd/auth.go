@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -80,8 +81,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	fmt.Print("Validating... ")
 	client := api.NewClient(token)
-	user, err := client.GetMe(cmd.Context())
-	if err != nil {
+	if err := client.Verify(cmd.Context()); err != nil {
 		fmt.Println("✗")
 		return err
 	}
@@ -96,8 +96,18 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	fmt.Printf("✓ Logged in as %s (%s)\n", user.Username, user.Email)
+	fmt.Printf("✓ %s\n", withIdentity("Logged in", cmd.Context(), client))
 	return nil
+}
+
+// withIdentity appends "as <user> (<email>)" to verb when the token resolves to
+// a user via /me. Workspace API tokens have no /me access, so verb is returned
+// as-is (e.g. "Logged in").
+func withIdentity(verb string, ctx context.Context, client *api.Client) string {
+	if u, err := client.GetMe(ctx); err == nil && u.Username != "" {
+		return fmt.Sprintf("%s as %s (%s)", verb, u.Username, u.Email)
+	}
+	return verb
 }
 
 func runAuthLogout(cmd *cobra.Command, args []string) error {
@@ -117,12 +127,12 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 	// Return errors (non-zero exit) so `br auth status && ...` is reliable in scripts.
 	token, err := config.GetToken()
 	if err != nil {
-		return fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_TOKEN")
+		return fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_API_TOKEN")
 	}
-	user, err := api.NewClient(token).GetMe(cmd.Context())
-	if err != nil {
+	client := api.NewClient(token)
+	if err := client.Verify(cmd.Context()); err != nil {
 		return fmt.Errorf("token invalid: %w", err)
 	}
-	fmt.Printf("✓ Authenticated as %s (%s)\n", user.Username, user.Email)
+	fmt.Printf("✓ %s\n", withIdentity("Authenticated", cmd.Context(), client))
 	return nil
 }

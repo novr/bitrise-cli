@@ -45,7 +45,7 @@ func runBuildLogs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	logText, archived, err := client.FetchLog(ctx, build.Slug)
+	logText, archived, err := client.FetchLog(ctx, appSlug, build.Slug)
 	if err != nil {
 		return fmt.Errorf("failed to fetch log: %w", err)
 	}

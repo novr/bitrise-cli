@@ -203,7 +203,7 @@ func TestFetchLogChunkOrdering(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	text, archived, err := c.FetchLog(context.Background(), "build-slug")
+	text, archived, err := c.FetchLog(context.Background(), "app-slug", "build-slug")
 	if err != nil {
 		t.Fatalf("FetchLog: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestFetchLogArchived(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(srv.URL)
-	text, archived, err := c.FetchLog(context.Background(), "build-slug")
+	text, archived, err := c.FetchLog(context.Background(), "app-slug", "build-slug")
 	if err != nil {
 		t.Fatalf("FetchLog: %v", err)
 	}

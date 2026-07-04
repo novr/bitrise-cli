@@ -180,7 +180,15 @@ func (c *Client) GetMe(ctx context.Context) (*User, error) {
 }
 
 func (c *Client) ListApps(ctx context.Context) ([]App, error) {
-	return fetchPaged[App](ctx, c, "/me/apps", url.Values{"sort_by": {"last_build_at"}}, 0)
+	// /apps (not /me/apps): the latter 404s for workspace API tokens.
+	return fetchPaged[App](ctx, c, "/apps", url.Values{"sort_by": {"last_build_at"}}, 0)
+}
+
+// Verify checks the token against a low-cost authenticated endpoint. It uses
+// /apps rather than /me so it works for both personal and workspace API tokens.
+func (c *Client) Verify(ctx context.Context) error {
+	_, err := c.do(ctx, "GET", "/apps", url.Values{"limit": {"1"}})
+	return err
 }
 
 type ListBuildsParams struct {
@@ -269,8 +277,8 @@ func (c *Client) GetBuildByNumber(ctx context.Context, appSlug string, buildNumb
 	return &builds[0], nil
 }
 
-func (c *Client) GetBuildLog(ctx context.Context, buildSlug string) (*BuildLog, error) {
-	body, err := c.do(ctx, "GET", "/builds/"+buildSlug+"/log", nil)
+func (c *Client) GetBuildLog(ctx context.Context, appSlug, buildSlug string) (*BuildLog, error) {
+	body, err := c.do(ctx, "GET", "/apps/"+appSlug+"/builds/"+buildSlug+"/log", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -302,8 +310,8 @@ func (c *Client) DownloadRawLog(ctx context.Context, rawURL string) (string, err
 }
 
 // FetchLog returns the full log text for a build, handling both archived and in-progress builds.
-func (c *Client) FetchLog(ctx context.Context, buildSlug string) (string, bool, error) {
-	logResp, err := c.GetBuildLog(ctx, buildSlug)
+func (c *Client) FetchLog(ctx context.Context, appSlug, buildSlug string) (string, bool, error) {
+	logResp, err := c.GetBuildLog(ctx, appSlug, buildSlug)
 	if err != nil {
 		return "", false, err
 	}

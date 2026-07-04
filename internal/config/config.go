@@ -60,16 +60,22 @@ func Save(cfg *Config) error {
 	return os.WriteFile(path, data, 0600)
 }
 
+// tokenEnvVars are the environment variables checked for a token, in order.
+// BITRISE_API_TOKEN is the more explicit name; BITRISE_TOKEN is kept for compat.
+var tokenEnvVars = []string{"BITRISE_API_TOKEN", "BITRISE_TOKEN"}
+
 func GetToken() (string, error) {
-	if token := os.Getenv("BITRISE_TOKEN"); token != "" {
-		return token, nil
+	for _, name := range tokenEnvVars {
+		if token := os.Getenv(name); token != "" {
+			return token, nil
+		}
 	}
 	cfg, err := Load()
 	if err != nil {
 		return "", err
 	}
 	if cfg.Token == "" {
-		return "", fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_TOKEN")
+		return "", fmt.Errorf("not authenticated: run 'br auth login' or set BITRISE_API_TOKEN")
 	}
 	return cfg.Token, nil
 }
