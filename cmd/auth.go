@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"br/internal/api"
 	"br/internal/config"
@@ -23,6 +25,7 @@ func init() {
 		RunE:  runAuthLogin,
 	}
 	loginCmd.Flags().Bool("no-browser", false, "Do not open the token settings page in a browser")
+	loginCmd.Flags().Bool("with-token", false, "Read the token from standard input (for pipes/CI)")
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(&cobra.Command{
 		Use:   "logout",
@@ -37,10 +40,21 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 }
 
-func runAuthLogin(cmd *cobra.Command, args []string) error {
+// readLoginToken obtains the PAT either from stdin (--with-token, for
+// pipes/CI) or via an interactive hidden prompt. The browser is opened only
+// for the interactive path on a real terminal.
+func readLoginToken(cmd *cobra.Command, withToken bool) (string, error) {
+	if withToken {
+		data, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return "", fmt.Errorf("failed to read token from stdin: %w", err)
+		}
+		return strings.TrimSpace(string(data)), nil
+	}
+
 	noBrowser, _ := cmd.Flags().GetBool("no-browser")
-	// Skip the browser when asked, or when stdin is not a terminal (CI, SSH,
-	// piped token) where launching a browser is pointless or impossible.
+	// Skip the browser when asked, or when stdin is not a terminal (CI, SSH)
+	// where launching a browser is pointless or impossible.
 	if !noBrowser && term.IsTerminal(int(os.Stdin.Fd())) {
 		openPATSettingsPage()
 	}
@@ -48,9 +62,18 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
-		return fmt.Errorf("failed to read token: %w", err)
+		return "", fmt.Errorf("failed to read token: %w", err)
 	}
-	token := string(tokenBytes)
+	return string(tokenBytes), nil
+}
+
+func runAuthLogin(cmd *cobra.Command, args []string) error {
+	withToken, _ := cmd.Flags().GetBool("with-token")
+
+	token, err := readLoginToken(cmd, withToken)
+	if err != nil {
+		return err
+	}
 	if token == "" {
 		return fmt.Errorf("token cannot be empty")
 	}
