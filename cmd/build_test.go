@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -21,6 +22,27 @@ func TestDetectAppFromGitNoRemote(t *testing.T) {
 	_, err := detectAppFromGit(context.Background(), nil)
 	if !errors.Is(err, errNoGitRemote) {
 		t.Errorf("detectAppFromGit outside a repo = %v, want errNoGitRemote", err)
+	}
+}
+
+func TestIsBenignGitError(t *testing.T) {
+	benign := []string{
+		"fatal: not a git repository (or any of the parent directories): .git",
+		"error: No such remote 'origin'",
+		"fatal: No such file or directory",
+	}
+	for _, s := range benign {
+		if !isBenignGitError(errors.New("exit status 1"), s) {
+			t.Errorf("isBenignGitError(%q) = false, want true", s)
+		}
+	}
+	// Git present but a real failure (e.g. permissions) must NOT be treated as benign.
+	if isBenignGitError(errors.New("exit status 128"), "fatal: could not read Username: Permission denied") {
+		t.Error("permission error classified as benign; should surface")
+	}
+	// Missing git binary is benign (can't detect; fall back).
+	if !isBenignGitError(exec.ErrNotFound, "") {
+		t.Error("exec.ErrNotFound should be benign")
 	}
 }
 

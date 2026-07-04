@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -63,14 +64,22 @@ func resolveAppSlug(ctx context.Context, cmd *cobra.Command, client *api.Client)
 	return "", fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, or run from a git repo connected to Bitrise")
 }
 
-// errNoGitRemote means the working directory has no usable origin remote, so
-// git-based app detection was skipped (as opposed to being tried and failing).
+// errNoGitRemote means git-based detection could not run for a benign reason
+// (git absent, not a repo, or no origin remote), so falling back to default_app
+// is safe. Unexpected git failures (corruption, permissions) are surfaced
+// instead, so they can't silently resolve to the wrong app.
 var errNoGitRemote = errors.New("no git remote")
 
 func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
-	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
+	gitCmd := exec.Command("git", "remote", "get-url", "origin")
+	var stderr bytes.Buffer
+	gitCmd.Stderr = &stderr
+	out, err := gitCmd.Output()
 	if err != nil {
-		return "", errNoGitRemote
+		if isBenignGitError(err, stderr.String()) {
+			return "", errNoGitRemote
+		}
+		return "", fmt.Errorf("git remote lookup failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	remoteURL := strings.TrimSpace(string(out))
 	normalized := normalizeGitURL(remoteURL)
@@ -85,6 +94,19 @@ func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("git remote %s is not connected to any Bitrise app you can access; use --app <slug> to override", remoteURL)
+}
+
+// isBenignGitError reports whether a git failure just means "no remote to
+// detect from" (git missing, not a repo, or origin unset) rather than a real
+// problem worth surfacing.
+func isBenignGitError(err error, stderr string) bool {
+	if errors.Is(err, exec.ErrNotFound) {
+		return true // git not installed
+	}
+	s := strings.ToLower(stderr)
+	return strings.Contains(s, "not a git repository") ||
+		strings.Contains(s, "no such remote") ||
+		strings.Contains(s, "no such file")
 }
 
 func normalizeGitURL(rawURL string) string {
