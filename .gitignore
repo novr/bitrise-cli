@@ -1,2 +1,7 @@
 br
 .env
+
+.DS_Store
+*.local.json
+.claude/
+coverage.out

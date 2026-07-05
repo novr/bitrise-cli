@@ -78,8 +78,11 @@ If an `origin` remote exists but matches no accessible app, this is a hard error
 Base URL: `https://api.bitrise.io/v0.1`  
 Auth header: `Authorization: <token>` (no "Bearer" prefix)
 
-Key endpoints used:
-- `GET /me` — validate token, get username
-- `GET /me/apps` — list apps (for git-remote auto-detection)
-- `GET /apps/{app-slug}/builds` — list builds; supports `build_number`, `branch`, `workflow`, `status`, `limit` query params
-- `GET /builds/{build-slug}/log` — log metadata + `expiring_raw_log_url` for archived logs
+Key endpoints used (paths verified live — workspace tokens 404 on `/me*`):
+- `GET /apps?limit=1` — token validation (`Client.Verify`); works for all token types
+- `GET /me` — best-effort username for the login greeting only (404 for workspace tokens)
+- `GET /apps` — list apps (for git-remote auto-detection); paginated via `paging.next`
+- `GET /apps/{app-slug}/builds` — list builds; supports `build_number`, `branch`, `workflow`, `status`, `limit`
+- `GET /apps/{app-slug}/builds/{build-slug}/log` — log metadata + `expiring_raw_log_url` for archived logs
+
+Build status codes: `1=success`, `2=error` (failed), `3=aborted`, `0=running`. There is no `duration` field — derive it from `started_on_worker_at`/`finished_at` (`Build.DurationSeconds`).

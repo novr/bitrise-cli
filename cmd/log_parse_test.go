@@ -126,6 +126,48 @@ func TestParseLogStepsUnrecognized(t *testing.T) {
 	}
 }
 
+// Mirrors real Bitrise log formatting (captured live from build #332):
+// wide padded step headers and the actual exit-code phrasings seen in the
+// wild ("Exit code:  65", "Bitrise build failed (exit code: 1)").
+func TestParseRealBitriseLogFormat(t *testing.T) {
+	const log = `
++------------------------------------------------------------------------------+
+| (0) Xcode Test for iOS                                                       |
++------------------------------------------------------------------------------+
+| id: xcode-test                                                               |
++------------------------------------------------------------------------------+
+Running tests...
+** TEST FAILED **
+Exit code:  65
+Xcode Test command exit code: 65
+
++------------------------------------------------------------------------------+
+| (1) Deploy to Bitrise.io                                                     |
++------------------------------------------------------------------------------+
+Uploaded artifacts
+
++------------------------------------------------------------------------------+
+| (2) Save Gradle Cache                                                        |
++------------------------------------------------------------------------------+
+Collecting cache paths...
+Bitrise build failed (exit code: 1)
+`
+	steps := parseLogSteps(log)
+	if len(steps) != 3 {
+		t.Fatalf("got %d steps, want 3: %v", len(steps), stepNames(steps))
+	}
+	failed := failedSteps(steps)
+	if len(failed) != 2 {
+		t.Fatalf("got %d failed, want 2: %v", len(failed), stepNames(failed))
+	}
+	if failed[0].Name != "Xcode Test for iOS" || failed[0].ExitCode != 65 {
+		t.Errorf("failed[0] = {%s, %d}, want {Xcode Test for iOS, 65}", failed[0].Name, failed[0].ExitCode)
+	}
+	if failed[1].Name != "Save Gradle Cache" || failed[1].ExitCode != 1 {
+		t.Errorf("failed[1] = {%s, %d}, want {Save Gradle Cache, 1}", failed[1].Name, failed[1].ExitCode)
+	}
+}
+
 func stepNames(steps []logStep) []string {
 	names := make([]string, len(steps))
 	for i, s := range steps {
