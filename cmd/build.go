@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"br/internal/api"
-	"br/internal/config"
+	"github.com/novr/bitrise-cli/internal/api"
+	"github.com/novr/bitrise-cli/internal/config"
 
 	"github.com/spf13/cobra"
 )

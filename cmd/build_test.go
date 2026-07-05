@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"br/internal/api"
+	"github.com/novr/bitrise-cli/internal/api"
 )
 
 // Outside a git repo, detection must return the errNoGitRemote sentinel so that

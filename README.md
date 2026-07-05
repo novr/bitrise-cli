@@ -2,6 +2,8 @@
 
 `gh` ライクな操作感で Bitrise のビルド履歴・ログにターミナルや AI アシスタント（Claude / Cursor）からシームレスにアクセスできる CLI ツール。
 
+> **非公式ツール**: これは個人が開発した非公式の CLI で、Bitrise 社の公式製品（[bitrise-io/bitrise](https://github.com/bitrise-io/bitrise)）とは無関係です。Bitrise は Bitrise 社の商標です。Bitrise API v0.1 を利用しますが、動作は保証されません。
+
 ## インストール
 
 ```bash

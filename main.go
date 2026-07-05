@@ -1,6 +1,6 @@
 package main
 
-import "br/cmd"
+import "github.com/novr/bitrise-cli/cmd"
 
 func main() {
 	cmd.Execute()

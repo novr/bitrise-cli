@@ -31,7 +31,7 @@ The built binary is `./br`. Run it directly: `./br build list --help`.
 
 ## Architecture
 
-This is a `gh`-style CLI for Bitrise CI/CD. The module name is `br`.
+This is a `gh`-style CLI for Bitrise CI/CD. The module is `github.com/novr/bitrise-cli`; the built binary is `br`.
 
 ```
 cmd/                   # Cobra command definitions (one file per command group)

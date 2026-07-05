@@ -1,4 +1,4 @@
-module br
+module github.com/novr/bitrise-cli
 
 go 1.22
 

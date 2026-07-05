@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"br/internal/config"
+	"github.com/novr/bitrise-cli/internal/config"
 
 	"github.com/spf13/cobra"
 )

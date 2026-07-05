@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"br/internal/api"
+	"github.com/novr/bitrise-cli/internal/api"
 
 	"github.com/spf13/cobra"
 )
