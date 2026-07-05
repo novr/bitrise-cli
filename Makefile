@@ -4,7 +4,7 @@ INSTALL_PATH := /usr/local/bin/$(BINARY)
 .PHONY: build install test vet tidy clean
 
 build:
-	go build -o $(BINARY) .
+	go build -o $(BINARY) ./cmd/br
 
 install: build
 	mv $(BINARY) $(INSTALL_PATH)

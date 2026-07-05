@@ -7,13 +7,14 @@
 ## インストール
 
 ```bash
-make install   # /usr/local/bin/br にインストール
+go install github.com/novr/bitrise-cli/cmd/br@latest   # br バイナリを $GOBIN に
 ```
 
-または手動ビルド:
+または手動ビルド / インストール:
 
 ```bash
-mise exec go@latest -- go build -o br .
+make install                 # /usr/local/bin/br にインストール
+go build -o br ./cmd/br      # カレントに br をビルド
 ```
 
 ## 認証

@@ -8,7 +8,7 @@ Go is managed via `mise`. Prefix all `go` commands with `mise exec go@latest --`
 
 ```bash
 # Build
-mise exec go@latest -- go build -o br .
+mise exec go@latest -- go build -o br ./cmd/br
 make build          # equivalent shortcut
 
 # Install to /usr/local/bin
@@ -34,6 +34,7 @@ The built binary is `./br`. Run it directly: `./br build list --help`.
 This is a `gh`-style CLI for Bitrise CI/CD. The module is `github.com/novr/bitrise-cli`; the built binary is `br`.
 
 ```
+cmd/br/main.go         # main package (entry point); binary name comes from this dir
 cmd/                   # Cobra command definitions (one file per command group)
   root.go              # rootCmd + Execute()
   auth.go              # br auth login / logout / status
