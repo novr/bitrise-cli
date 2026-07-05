@@ -103,16 +103,15 @@ func isBenignGitError(err error, stderr string) bool {
 	if errors.Is(err, exec.ErrNotFound) {
 		return true // git not installed
 	}
-	// Prefer exit codes: they're locale-independent, unlike stderr text which
-	// git localizes. 2 = no such remote, 128 = not a git repository.
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		switch exitErr.ExitCode() {
-		case 2, 128:
-			return true
-		}
-	}
 	s := strings.ToLower(stderr)
+	// exit 2 = "no such remote" (origin unset): unambiguously benign, and
+	// locale-independent.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
+		return true
+	}
+	// 128 is overloaded (not-a-repo, but also permission/corruption), so require
+	// stderr to confirm a benign cause rather than blanket-trusting the code.
 	return strings.Contains(s, "not a git repository") ||
 		strings.Contains(s, "no such remote") ||
 		strings.Contains(s, "no such file")

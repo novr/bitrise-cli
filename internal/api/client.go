@@ -71,8 +71,25 @@ type Build struct {
 	Status            BuildStatus `json:"status"`
 	StatusText        string      `json:"status_text"`
 	TriggeredAt       time.Time   `json:"triggered_at"`
+	StartedOnWorkerAt *time.Time  `json:"started_on_worker_at"`
 	FinishedAt        *time.Time  `json:"finished_at"`
-	Duration          int         `json:"duration_in_seconds"`
+}
+
+// DurationSeconds returns the run duration for a finished build. The API has no
+// duration field, so it's derived from start (on-worker, else triggered) to
+// finish. Returns 0 if the build hasn't finished.
+func (b Build) DurationSeconds() int {
+	if b.FinishedAt == nil {
+		return 0
+	}
+	start := b.TriggeredAt
+	if b.StartedOnWorkerAt != nil {
+		start = *b.StartedOnWorkerAt
+	}
+	if d := int(b.FinishedAt.Sub(start).Seconds()); d > 0 {
+		return d
+	}
+	return 0
 }
 
 type BuildLog struct {

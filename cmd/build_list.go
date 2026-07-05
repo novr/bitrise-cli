@@ -130,7 +130,7 @@ func buildToFieldMap(b api.Build) map[string]interface{} {
 		"commitHash":      b.CommitHash,
 		"triggeredAt":     b.TriggeredAt,
 		"finishedAt":      b.FinishedAt,
-		"durationSeconds": b.Duration,
+		"durationSeconds": b.DurationSeconds(),
 	}
 }
 

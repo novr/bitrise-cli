@@ -52,8 +52,8 @@ func runBuildView(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Commit:    %s%s\n", truncate(build.CommitMessage, 72), hash)
 	}
 	fmt.Printf("  Triggered: %s\n", timeAgo(build.TriggeredAt))
-	if build.Status != api.StatusRunning && build.Duration > 0 {
-		fmt.Printf("  Duration:  %s\n", formatDuration(build.Duration))
+	if d := build.DurationSeconds(); d > 0 {
+		fmt.Printf("  Duration:  %s\n", formatDuration(d))
 	}
 
 	// For finished failed builds, try to parse step failures from the log

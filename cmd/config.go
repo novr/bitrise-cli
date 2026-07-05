@@ -47,12 +47,18 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Use GetToken so env-var auth (BITRISE_API_TOKEN) is reflected, not just
+	// the stored token.
 	authed := "no"
-	if cfg.Token != "" {
+	source := ""
+	if _, err := config.GetToken(); err == nil {
 		authed = "yes"
+		if cfg.Token == "" {
+			source = " (from environment)"
+		}
 	}
-	fmt.Printf("Config file:  %s\n", path)
-	fmt.Printf("Authenticated: %s\n", authed)
+	fmt.Printf("Config file:   %s\n", path)
+	fmt.Printf("Authenticated: %s%s\n", authed, source)
 	fmt.Printf("Default app:   %s\n", orNone(cfg.DefaultApp))
 	return nil
 }
