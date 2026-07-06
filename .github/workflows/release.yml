@@ -159,10 +159,10 @@ jobs:
 
           delete_legacy_asset() {
             local name="$1"
-            local asset_id
-            asset_id="$(gh release view "${TAG}" --json assets -q ".assets[] | select(.name == \"${name}\") | .id" || true)"
-            if [[ -n "${asset_id}" ]]; then
-              gh api -X DELETE "repos/${{ github.repository }}/releases/assets/${asset_id}"
+            local api_url
+            api_url="$(gh release view "${TAG}" --json assets -q ".assets[] | select(.name == \"${name}\") | .apiUrl" 2>/dev/null || true)"
+            if [[ -n "${api_url}" ]]; then
+              gh api -X DELETE "${api_url}"
             fi
           }
 
