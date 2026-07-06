@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
+	"path/filepath"
 
 	"github.com/novr/bitrise-cli/internal/api"
 	"github.com/novr/bitrise-cli/internal/config"
@@ -25,62 +25,55 @@ func init() {
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	issues := 0
+	var client *api.Client
 
 	token, authErr := config.GetToken()
 	if authErr != nil {
 		fmt.Println("✗ authentication: not authenticated")
 		issues++
 	} else {
-		client := api.NewClient(token)
+		client = api.NewClient(token)
 		if err := client.Verify(cmd.Context()); err != nil {
 			fmt.Printf("✗ authentication: token invalid: %v\n", err)
 			issues++
+			client = nil
 		} else {
 			fmt.Println("✓ authentication: ok")
 		}
 	}
 
-	if deprecated, err := config.DeprecatedDefaultApp(); err != nil {
+	if slug, ok, err := config.DeprecatedDefaultAppValue(); err != nil {
 		return err
-	} else if deprecated {
+	} else if ok {
 		fmt.Println("⚠ warning: config.yml contains deprecated default_app (ignored); remove it")
+		fmt.Printf("  tip: run br config set app %s in your project directory\n", slug)
 	}
 
-	var client *api.Client
-	if authErr == nil {
-		client = api.NewClient(token)
-	}
-
-	slug, localPath, gitSlug, gitErr, resolveErr := diagnoseAppResolution(cmd.Context(), cmd, client)
+	res, resolveErr := resolveAppSlugDetailed(cmd.Context(), cmd, client, true)
 	if resolveErr != nil {
 		fmt.Printf("✗ app resolution: %v\n", resolveErr)
 		issues++
 	} else {
-		fmt.Printf("✓ app resolution: %s\n", slug)
+		fmt.Printf("✓ app resolution: %s\n", res.Slug)
 	}
 
-	if localPath != "" {
-		fmt.Printf("  local config: %s\n", localPath)
-		if cwdPath, err := localConfigCwdPath(); err == nil && localPath != cwdPath {
-			fmt.Printf("  info: using .br.yml from %s\n", localPath)
+	if res.LocalPath != "" {
+		fmt.Printf("  local config: %s\n", res.LocalPath)
+		if cwdPath, err := localConfigCwdPath(); err == nil && !samePath(res.LocalPath, cwdPath) {
+			fmt.Printf("  info: using .br.yml from %s\n", res.LocalPath)
 		}
 	}
 
-	if slug != "" && client != nil {
-		if _, err := client.ListBuilds(cmd.Context(), slug, api.ListBuildsParams{Limit: 1}); err != nil {
-			fmt.Printf("✗ API reachability: app %q not accessible: %v\n", slug, err)
+	if res.Slug != "" && client != nil {
+		if _, err := client.ListBuilds(cmd.Context(), res.Slug, api.ListBuildsParams{Limit: 1}); err != nil {
+			fmt.Printf("✗ API reachability: app %q not accessible: %v\n", res.Slug, err)
 			issues++
 		} else {
 			fmt.Println("✓ API reachability: ok")
 		}
 	}
 
-	if localPath != "" && gitErr == nil && gitSlug != "" && gitSlug != slug {
-		fmt.Printf("⚠ warning: .br.yml app (%s) differs from git-detected app (%s)\n", slug, gitSlug)
-	}
-	if localPath != "" && gitErr != nil && !errors.Is(gitErr, errNoGitRemote) {
-		fmt.Printf("  info: .br.yml supplies app; git detection failed (%v)\n", gitErr)
-	}
+	doctorSlugWarnings(res, cmd.OutOrStdout())
 
 	if issues > 0 {
 		return fmt.Errorf("%d issue(s) found", issues)
@@ -88,34 +81,27 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func diagnoseAppResolution(ctx context.Context, cmd *cobra.Command, client *api.Client) (slug, localPath, gitSlug string, gitErr, resolveErr error) {
-	if s, _ := cmd.Flags().GetString("app"); s != "" {
-		return s, "", "", nil, nil
+func doctorSlugWarnings(res appResolution, w io.Writer) {
+	if res.LocalPath != "" && res.GitErr == nil && res.GitSlug != "" && res.GitSlug != res.Slug {
+		fmt.Fprintf(w, "⚠ warning: .br.yml app (%s) differs from git-detected app (%s)\n", res.Slug, res.GitSlug)
 	}
-	if s := os.Getenv("BITRISE_APP_SLUG"); s != "" {
-		return s, "", "", nil, nil
+	if res.LocalPath != "" && res.GitErr != nil && !errors.Is(res.GitErr, errNoGitRemote) {
+		fmt.Fprintf(w, "  info: .br.yml supplies app; git detection failed (%v)\n", res.GitErr)
 	}
+}
 
-	local, path, findErr := config.FindLocalConfig()
-	if findErr != nil {
-		return "", "", "", nil, findErr
+func samePath(a, b string) bool {
+	// /var vs /private/var on macOS would otherwise show a false "inherited" path.
+	a = filepath.Clean(a)
+	b = filepath.Clean(b)
+	if a == b {
+		return true
 	}
-
-	if client != nil {
-		gitSlug, gitErr = detectAppFromGit(ctx, client)
-	} else {
-		gitErr = errNoGitRemote
+	if ra, err := filepath.EvalSymlinks(a); err == nil {
+		a = ra
 	}
-
-	if local != nil && local.App != "" {
-		return local.App, path, gitSlug, gitErr, nil
+	if rb, err := filepath.EvalSymlinks(b); err == nil {
+		b = rb
 	}
-
-	if gitErr == nil {
-		return gitSlug, "", gitSlug, nil, nil
-	}
-	if !errors.Is(gitErr, errNoGitRemote) {
-		return "", "", "", gitErr, gitErr
-	}
-	return "", "", "", gitErr, fmt.Errorf("could not determine Bitrise app")
+	return filepath.Clean(a) == filepath.Clean(b)
 }

@@ -114,6 +114,34 @@ func TestFindLocalConfigSkipsEmptyApp(t *testing.T) {
 	}
 }
 
+func TestFindLocalConfigSkipsWhitespaceOnlyApp(t *testing.T) {
+	root := initGitRepo(t)
+	if err := os.WriteFile(filepath.Join(root, LocalConfigFileName), []byte("app: \"   \"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(root, "pkg")
+	if err := os.Mkdir(sub, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, LocalConfigFileName), []byte("app: child\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(sub); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _, err := FindLocalConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.App != "child" {
+		t.Fatalf("app = %q, want child", cfg.App)
+	}
+}
+
 func TestFindLocalConfigInvalidYAML(t *testing.T) {
 	root := initGitRepo(t)
 	if err := os.WriteFile(filepath.Join(root, LocalConfigFileName), []byte("app: [\n"), 0644); err != nil {

@@ -39,6 +39,13 @@ func NewClient(token string) *Client {
 	}
 }
 
+// NewClientWithBaseURL exists so tests can point at httptest servers.
+func NewClientWithBaseURL(token, baseURL string) *Client {
+	c := NewClient(token)
+	c.baseURL = baseURL
+	return c
+}
+
 type User struct {
 	Slug     string `json:"slug"`
 	Username string `json:"username"`

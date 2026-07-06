@@ -12,10 +12,9 @@ import (
 	"time"
 )
 
-// newTestClient returns a client pointed at srv with retries sped up.
+// newTestClient disables retry backoff so rate-limit tests finish quickly.
 func newTestClient(baseURL string) *Client {
-	c := NewClient("test-token")
-	c.baseURL = baseURL
+	c := NewClientWithBaseURL("test-token", baseURL)
 	c.backoff = 0
 	return c
 }

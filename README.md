@@ -152,9 +152,11 @@ br doctor   # 認証・app 解決・API 到達性を確認（CI 向け）
 3. `.br.yml`（カレントディレクトリから親方向、git root まで）
 4. `git remote get-url origin` → Bitrise アプリの `repo_url` と照合
 
+グローバルな `default_app` は廃止しています。1 つのホーム設定にフォールバックすると、モノレポや複数リポジトリ環境で別アプリを黙って参照する恐れがあるためです。
+
 ### プロジェクトローカル設定（`.br.yml`）
 
-リポジトリにコミットするプロジェクト設定です。モノレポではサブディレクトリごとに置けます。
+アプリ slug をリポジトリにコミットしてチームで共有するための設定です。探索は git root まで（`bitrise.yml` では止めない）。Bitrise のモノレポは CI 定義が root に集約されることが多く、root の `.br.yml` をサブパッケージから継承できるようにするためです。
 
 ```yaml
 app: <app-slug>
@@ -162,12 +164,12 @@ app: <app-slug>
 
 ```
 monorepo/
-  .br.yml          # 共通 app（サブに無ければ継承）
+  .br.yml          # サブに無ければここが使われる
   ios/
-    .br.yml        # ios 専用 app
+    .br.yml        # 同一 origin で別 Bitrise アプリに向けたいとき
 ```
 
-`br config set app <slug>` でカレントディレクトリに書き込めます。fork 先など origin が Bitrise と一致しない場合は `--app` を使ってください。
+`br config set app <slug>` でカレントディレクトリに書き込めます。fork 先など origin が Bitrise と一致しない場合は `--app` を使ってください。日常のコマンドでは slug 不一致に気づきにくいため、CI では `br doctor` の利用を推奨します。
 
 ## AI アシスタントとの連携例
 
@@ -183,7 +185,7 @@ br build logs 123 --failed-only
 
 ## 設定ファイル
 
-`~/.config/br/config.yml` にトークンが保存されます。アプリ slug はプロジェクトの `.br.yml` に置きます（コミット推奨）。
+`~/.config/br/config.yml` にはトークンのみ保存します。アプリ slug はプロジェクトの `.br.yml` に置きます（チーム共有・モノレポ単位の切り替えのためコミット推奨）。
 
 ```yaml
 token: <your-token>

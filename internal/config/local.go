@@ -16,8 +16,7 @@ type LocalConfig struct {
 	App string `yaml:"app"`
 }
 
-// GitRoot returns the absolute path to the git repository root for dir.
-func GitRoot(dir string) (string, error) {
+func gitRoot(dir string) (string, error) {
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel")
 	out, err := cmd.Output()
 	if err != nil {
@@ -30,7 +29,6 @@ func GitRoot(dir string) (string, error) {
 	return root, nil
 }
 
-// LoadLocalConfig reads and parses a .br.yml file at path.
 func LoadLocalConfig(path string) (*LocalConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -40,21 +38,26 @@ func LoadLocalConfig(path string) (*LocalConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+	cfg.App = strings.TrimSpace(cfg.App) // YAML may carry whitespace-only as "set"
 	return &cfg, nil
 }
 
-// FindLocalConfig walks from cwd toward git root (parent direction only) and
-// returns the first .br.yml with a non-empty app field.
+// FindLocalConfig returns the nearest .br.yml with a non-empty app, walking parents
+// only up to the git root so monorepo root config is shared; outside a repo we stop
+// at cwd to avoid picking up a parent directory's unrelated project.
 func FindLocalConfig() (*LocalConfig, string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, "", err
 	}
+	return findLocalConfigFrom(cwd)
+}
 
-	root, rootErr := GitRoot(cwd)
+func findLocalConfigFrom(startDir string) (*LocalConfig, string, error) {
+	root, rootErr := gitRoot(startDir)
 	inRepo := rootErr == nil
 
-	dir := cwd
+	dir := startDir
 	for {
 		path := filepath.Join(dir, LocalConfigFileName)
 		if _, statErr := os.Stat(path); statErr == nil {
@@ -62,7 +65,7 @@ func FindLocalConfig() (*LocalConfig, string, error) {
 			if loadErr != nil {
 				return nil, "", loadErr
 			}
-			if cfg.App != "" {
+			if cfg.App != "" { // empty app defers to a parent .br.yml
 				return cfg, path, nil
 			}
 		}
@@ -82,7 +85,6 @@ func FindLocalConfig() (*LocalConfig, string, error) {
 	return nil, "", nil
 }
 
-// WriteLocalConfig writes app to .br.yml in dir.
 func WriteLocalConfig(dir, app string) (string, error) {
 	path := filepath.Join(dir, LocalConfigFileName)
 	data, err := yaml.Marshal(&LocalConfig{App: app})
@@ -99,27 +101,32 @@ func WriteLocalConfig(dir, app string) (string, error) {
 	return abs, nil
 }
 
-// DeprecatedDefaultApp reports whether config.yml still contains default_app.
-func DeprecatedDefaultApp() (bool, error) {
+// DeprecatedDefaultAppValue reads config.yml as raw YAML because default_app was
+// removed from Config; we still need to spot stale entries for doctor migration hints.
+func DeprecatedDefaultAppValue() (slug string, ok bool, err error) {
 	path, err := configPath()
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return false, nil
+		return "", false, nil
 	}
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	var raw map[string]any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, err
+		return "", false, err
 	}
-	v, ok := raw["default_app"]
-	if !ok || v == nil {
-		return false, nil
+	v, exists := raw["default_app"]
+	if !exists || v == nil {
+		return "", false, nil
 	}
 	s, _ := v.(string)
-	return strings.TrimSpace(s) != "", nil
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false, nil
+	}
+	return s, true, nil
 }

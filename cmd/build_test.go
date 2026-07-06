@@ -14,7 +14,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Outside a git repo, detection must return errNoGitRemote when no .br.yml is set.
+// errNoGitRemote must be returned here so resolveAppSlug can tell benign
+// "no remote" apart from errors that should abort immediately.
 func TestDetectAppFromGitNoRemote(t *testing.T) {
 	orig, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(orig) })

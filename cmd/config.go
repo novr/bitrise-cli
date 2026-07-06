@@ -40,10 +40,14 @@ func init() {
 func runConfigSetApp(cmd *cobra.Command, args []string) error {
 	slug := args[0]
 
+	validated := false
 	if client, err := newAPIClient(); err == nil {
 		if _, err := client.ListBuilds(cmd.Context(), slug, api.ListBuildsParams{Limit: 1}); err != nil {
 			return fmt.Errorf("app slug %q not found or not accessible: %w", slug, err)
 		}
+		validated = true
+	} else {
+		fmt.Fprintf(cmd.ErrOrStderr(), "⚠ warning: not authenticated; writing %q without API validation\n", slug)
 	}
 
 	cwd, err := os.Getwd()
@@ -54,7 +58,11 @@ func runConfigSetApp(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✓ wrote app to %s\n", path)
+	if validated {
+		fmt.Printf("✓ wrote app to %s\n", path)
+	} else {
+		fmt.Printf("✓ wrote app to %s (unvalidated)\n", path)
+	}
 	return nil
 }
 
@@ -95,11 +103,4 @@ func localConfigCwdPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, config.LocalConfigFileName), nil
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return "(none)"
-	}
-	return s
 }
