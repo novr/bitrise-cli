@@ -7,6 +7,22 @@
 ## インストール
 
 ```bash
+brew install novr/taps/br          # macOS (Apple Silicon / Intel)
+```
+
+Linux は [Releases](https://github.com/novr/bitrise-cli/releases) から取得（`br_<version>_linux_<arch>.tar.gz`）:
+
+```bash
+VERSION=0.1.0
+ARCH=$(uname -m)   # x86_64 → amd64, aarch64 → arm64
+case "${ARCH}" in x86_64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; esac
+curl -fsSL "https://github.com/novr/bitrise-cli/releases/download/v${VERSION}/br_${VERSION}_linux_${ARCH}.tar.gz" | tar -xz
+sudo mv br /usr/local/bin/
+```
+
+または:
+
+```bash
 go install github.com/novr/bitrise-cli/cmd/br@latest   # br バイナリを $GOBIN に
 ```
 

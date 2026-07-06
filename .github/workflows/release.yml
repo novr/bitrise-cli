@@ -1,0 +1,207 @@
+name: Release Assets
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (example: v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ -z "${TAG}" ]]; then
+            echo "Tag is required."
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          if [[ "${VERSION}" == *"-rc."* || "${VERSION}" == *"-test."* ]]; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+          fi
+          {
+            echo "tag=${TAG}"
+            echo "version=${VERSION}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@4de086c0a6b0dd1e54976b0ae03d335815f47a05 # v6.2.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          GOOS="${{ matrix.goos }}"
+          GOARCH="${{ matrix.goarch }}"
+          ASSET="br_${VERSION}_${GOOS}_${GOARCH}.tar.gz"
+
+          GOOS="${GOOS}" GOARCH="${GOARCH}" CGO_ENABLED=0 go build \
+            -ldflags "-s -w -X github.com/novr/bitrise-cli/internal/api.Version=${VERSION}" \
+            -o br ./cmd/br
+
+          mkdir -p dist
+          cp ./br "./dist/br"
+          tar -C dist -czf "${ASSET}" br
+
+      - name: Upload platform asset
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: br-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: br_${{ needs.prepare.outputs.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Download all platform assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          pattern: br-*
+          merge-multiple: true
+
+      - name: Build checksums and release metadata
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          shasum -a 256 br_*.tar.gz > checksums.txt
+          cat checksums.txt
+
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TAG="${{ needs.prepare.outputs.tag }}"
+          lookup() {
+            local asset="$1"
+            awk -v f="${asset}" '$2 == f { print $1; exit }' checksums.txt
+          }
+
+          ARM_ASSET="br_${VERSION}_darwin_arm64.tar.gz"
+          INTEL_ASSET="br_${VERSION}_darwin_amd64.tar.gz"
+
+          {
+            echo "arm_sha256=$(lookup "${ARM_ASSET}")"
+            echo "intel_sha256=$(lookup "${INTEL_ASSET}")"
+            echo "arm_url=https://github.com/novr/bitrise-cli/releases/download/${TAG}/${ARM_ASSET}"
+            echo "intel_url=https://github.com/novr/bitrise-cli/releases/download/${TAG}/${INTEL_ASSET}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Create or update release with assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.prepare.outputs.tag }}"
+          TITLE="${TAG}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/br_*.tar.gz dist/checksums.txt --clobber
+          else
+            if [[ "${{ needs.prepare.outputs.prerelease }}" == "true" ]]; then
+              PRERELEASE_FLAG="--prerelease"
+            else
+              PRERELEASE_FLAG=""
+            fi
+
+            gh release create "${TAG}" \
+              dist/br_*.tar.gz \
+              dist/checksums.txt \
+              --target "${{ github.sha }}" \
+              --generate-notes \
+              --title "${TITLE}" \
+              ${PRERELEASE_FLAG}
+          fi
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.NOVRD_BOT_APP_ID }}
+          private-key: ${{ secrets.NOVRD_BOT_KEY }}
+          owner: novr
+          repositories: homebrew-taps
+
+      - name: Dispatch homebrew formula update
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # First release: add-formula (default). After Formula/br.rb exists, set repo
+          # variable HOMEBREW_FORMULA_EVENT=update-formula on novr/bitrise-cli.
+          FORMULA_EVENT: ${{ vars.HOMEBREW_FORMULA_EVENT || 'add-formula' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/novr/homebrew-taps/dispatches \
+            --method POST \
+            --input - <<EOF
+          {
+            "event_type": "${FORMULA_EVENT}",
+            "client_payload": {
+              "formula": "br",
+              "version": "${{ needs.prepare.outputs.version }}",
+              "arm_url": "${{ steps.assets.outputs.arm_url }}",
+              "arm_sha256": "${{ steps.assets.outputs.arm_sha256 }}",
+              "intel_url": "${{ steps.assets.outputs.intel_url }}",
+              "intel_sha256": "${{ steps.assets.outputs.intel_sha256 }}",
+              "desc": "Unofficial Bitrise CLI for build history and logs",
+              "homepage": "https://github.com/novr/bitrise-cli",
+              "license": "MIT",
+              "binary": "br",
+              "test_match": "Bitrise CLI"
+            }
+          }
+          EOF
