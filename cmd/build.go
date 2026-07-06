@@ -99,7 +99,7 @@ func resolveAppSlugDetailed(ctx context.Context, cmd *cobra.Command, client *api
 var errNoGitRemote = errors.New("no git remote")
 
 func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
-	gitCmd := exec.Command("git", "remote", "get-url", "origin")
+	gitCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
 	var stderr bytes.Buffer
 	gitCmd.Stderr = &stderr
 	out, err := gitCmd.Output()

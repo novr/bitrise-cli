@@ -175,6 +175,13 @@ func TestWriteLocalConfig(t *testing.T) {
 	}
 }
 
+func TestWriteLocalConfigRejectsEmptyApp(t *testing.T) {
+	_, err := WriteLocalConfig(t.TempDir(), "   ")
+	if err == nil {
+		t.Fatal("expected error for whitespace-only app")
+	}
+}
+
 func initGitRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

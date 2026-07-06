@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/novr/bitrise-cli/internal/api"
 	"github.com/novr/bitrise-cli/internal/config"
@@ -38,7 +39,10 @@ func init() {
 }
 
 func runConfigSetApp(cmd *cobra.Command, args []string) error {
-	slug := args[0]
+	slug := strings.TrimSpace(args[0])
+	if slug == "" {
+		return fmt.Errorf("app slug must not be empty")
+	}
 
 	validated := false
 	if client, err := newAPIClient(); err == nil {

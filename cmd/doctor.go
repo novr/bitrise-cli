@@ -23,6 +23,10 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 }
 
+var newDoctorAPIClient = func(token string) *api.Client {
+	return api.NewClient(token)
+}
+
 func runDoctor(cmd *cobra.Command, args []string) error {
 	issues := 0
 	var client *api.Client
@@ -32,7 +36,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fmt.Println("✗ authentication: not authenticated")
 		issues++
 	} else {
-		client = api.NewClient(token)
+		client = newDoctorAPIClient(token)
 		if err := client.Verify(cmd.Context()); err != nil {
 			fmt.Printf("✗ authentication: token invalid: %v\n", err)
 			issues++

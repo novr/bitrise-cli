@@ -1,16 +1,16 @@
 # br — Bitrise CLI
 
-`gh` ライクな操作感で Bitrise のビルド履歴・ログにターミナルや AI アシスタント（Claude / Cursor）からシームレスにアクセスできる CLI ツール。
+A `gh`-style CLI for accessing Bitrise build history and logs from your terminal or AI assistants (Claude / Cursor).
 
-> **非公式ツール**: これは個人が開発した非公式の CLI で、Bitrise 社の公式製品（[bitrise-io/bitrise](https://github.com/bitrise-io/bitrise)）とは無関係です。Bitrise は Bitrise 社の商標です。Bitrise API v0.1 を利用しますが、動作は保証されません。
+> **Unofficial tool**: This is a community CLI, not affiliated with Bitrise's official product ([bitrise-io/bitrise](https://github.com/bitrise-io/bitrise)). Bitrise is a trademark of Bitrise Ltd. It uses the Bitrise API v0.1; behavior is not guaranteed.
 
-## インストール
+## Installation
 
 ```bash
 brew install novr/taps/br          # macOS (Apple Silicon / Intel)
 ```
 
-Linux は [Releases](https://github.com/novr/bitrise-cli/releases) から取得（`br_<version>_linux_<arch>.tar.gz`）:
+On Linux, download from [Releases](https://github.com/novr/bitrise-cli/releases) (`br_<version>_linux_<arch>.tar.gz`):
 
 ```bash
 VERSION=0.1.0
@@ -20,22 +20,22 @@ curl -fsSL "https://github.com/novr/bitrise-cli/releases/download/v${VERSION}/br
 sudo mv br /usr/local/bin/
 ```
 
-または:
+Or:
 
 ```bash
-go install github.com/novr/bitrise-cli/cmd/br@latest   # br バイナリを $GOBIN に
+go install github.com/novr/bitrise-cli/cmd/br@latest
 ```
 
-または手動ビルド / インストール:
+Or build / install manually:
 
 ```bash
-make install                 # /usr/local/bin/br にインストール
-go build -o br ./cmd/br      # カレントに br をビルド
+make install                 # installs to /usr/local/bin/br
+go build -o br ./cmd/br      # builds br in the current directory
 ```
 
-## 認証
+## Authentication
 
-Bitrise の [Personal Access Token](https://app.bitrise.io/me/profile#/security) を取得して:
+Create a Bitrise [Personal Access Token](https://app.bitrise.io/me/profile#/security), then:
 
 ```bash
 br auth login
@@ -44,23 +44,23 @@ br auth login
 # ✓ Logged in
 ```
 
-トークン発行ページは URL 表示のみで、ブラウザは自動では開きません。CI・スクリプトでは標準入力からトークンを渡せます:
+The login flow prints the token URL only; it does not open a browser. For CI and scripts, pipe the token on stdin:
 
 ```bash
 echo "$BITRISE_API_TOKEN" | br auth login --with-token
 ```
 
-環境変数を使う場合は最優先で参照されます（`br auth login` 不要）。`BITRISE_API_TOKEN`（推奨）または `BITRISE_TOKEN`:
+Environment variables take precedence (no `br auth login` required). Use `BITRISE_API_TOKEN` (recommended) or `BITRISE_TOKEN`:
 
 ```bash
 export BITRISE_API_TOKEN=<your-token>
 ```
 
-## 使い方
+## Usage
 
-### ビルド一覧
+### List builds
 
-カレントディレクトリの git remote から Bitrise アプリを自動検出します。
+The Bitrise app is resolved from `--app`, `BITRISE_APP_SLUG`, `.br.yml`, or the git remote (see [App auto-detection](#app-auto-detection)).
 
 ```bash
 br build list
@@ -68,9 +68,9 @@ br build list --limit 20
 br build list --branch main --status failed   # status: success/failed/error/running/aborted
 ```
 
-> git remote があるのに対応する Bitrise アプリが見つからない場合はエラーになります（誤ったアプリを参照しないため）。`--app <slug>` や `.br.yml` で明示できます。
+> If a git remote exists but matches no accessible Bitrise app, the command errors (to avoid targeting the wrong app). Override with `--app <slug>` or `.br.yml`.
 
-**AI（Claude / Cursor）向け JSON 出力:**
+**JSON output for AI assistants (Claude / Cursor):**
 
 ```bash
 br build list --limit 3 --json status,buildNumber,branch,workflow
@@ -84,9 +84,9 @@ br build list --limit 3 --json status,buildNumber,branch,workflow
 ]
 ```
 
-`--json all` で全フィールドを返します。未知のフィールド名を指定するとエラーになります。
+`--json all` returns every field. Unknown field names produce an error.
 
-### ビルド詳細
+### Build details
 
 ```bash
 br build view 123
@@ -101,62 +101,62 @@ br build view 123
 #   To see errors only: br build logs 123 --failed-only
 ```
 
-### ログ確認
+### Logs
 
 ```bash
-br build logs 123               # フルログを出力
-br build logs 123 --failed-only # 失敗したステップのログだけ出力
+br build logs 123               # full log
+br build logs 123 --failed-only # failed steps only
 ```
 
-`--failed-only` は Claude / Cursor に「このログを元にコードを修正して」と渡す際に特に有効です。
+`--failed-only` is especially useful when asking Claude / Cursor to analyze logs and suggest fixes.
 
-### アプリ一覧
+### App list
 
 ```bash
 br app list
-br app list --json slug,title   # フィールド: slug, title, repoURL, または all
+br app list --json slug,title   # fields: slug, title, repoURL, or all
 ```
 
-### バージョン
+### Version
 
 ```bash
 br version
 ```
 
-### 設定
+### Configuration
 
 ```bash
-br config show                # グローバル設定 + 有効な .br.yml のパス/app を表示
-br config set app <app-slug>  # カレントディレクトリに .br.yml を書き込み
+br config show                # global config + effective .br.yml path/app
+br config set app <app-slug>  # write .br.yml in the current directory
 ```
 
-### 診断
+### Diagnostics
 
 ```bash
-br doctor   # 認証・app 解決・API 到達性を確認（CI 向け）
+br doctor   # check auth, app resolution, and API reachability (CI-friendly)
 ```
 
-## フラグ共通オプション
+## Common flags
 
-| フラグ | 説明 |
-|--------|------|
-| `--app <slug>` | Bitrise アプリスラグを直接指定（自動検出を上書き） |
-| `BITRISE_APP_SLUG` | 環境変数でアプリを指定 |
+| Flag | Description |
+|------|-------------|
+| `--app <slug>` | Bitrise app slug (overrides auto-detection) |
+| `BITRISE_APP_SLUG` | App slug via environment variable |
 
-## アプリの自動検出
+## App auto-detection
 
-`br build` 系コマンドは以下の優先順位でアプリを特定します:
+`br build` commands resolve the app in this order:
 
-1. `--app` フラグ
-2. `BITRISE_APP_SLUG` 環境変数
-3. `.br.yml`（カレントディレクトリから親方向、git root まで）
-4. `git remote get-url origin` → Bitrise アプリの `repo_url` と照合
+1. `--app` flag
+2. `BITRISE_APP_SLUG` environment variable
+3. `.br.yml` (current directory upward to git root)
+4. `git remote get-url origin` matched against Bitrise app `repo_url`
 
-グローバルな `default_app` は廃止しています。1 つのホーム設定にフォールバックすると、モノレポや複数リポジトリ環境で別アプリを黙って参照する恐れがあるためです。
+Global `default_app` was removed. A single home-dir fallback could silently target the wrong app in monorepos and multi-repo setups.
 
-### プロジェクトローカル設定（`.br.yml`）
+### Project-local config (`.br.yml`)
 
-アプリ slug をリポジトリにコミットしてチームで共有するための設定です。探索は git root まで（`bitrise.yml` では止めない）。Bitrise のモノレポは CI 定義が root に集約されることが多く、root の `.br.yml` をサブパッケージから継承できるようにするためです。
+Commit app slugs to the repo so the team shares the same target. Discovery walks up to git root (not `bitrise.yml`), because Bitrise monorepos usually centralize CI at the repo root and subpackages should inherit the root `.br.yml`.
 
 ```yaml
 app: <app-slug>
@@ -164,31 +164,30 @@ app: <app-slug>
 
 ```
 monorepo/
-  .br.yml          # サブに無ければここが使われる
+  .br.yml          # used when a subdirectory has no .br.yml
   ios/
-    .br.yml        # 同一 origin で別 Bitrise アプリに向けたいとき
+    .br.yml        # point at a different Bitrise app on the same origin
 ```
 
-`br config set app <slug>` でカレントディレクトリに書き込めます。fork 先など origin が Bitrise と一致しない場合は `--app` を使ってください。日常のコマンドでは slug 不一致に気づきにくいため、CI では `br doctor` の利用を推奨します。
+Run `br config set app <slug>` to write the file in the current directory. Use `--app` when the fork's origin does not match Bitrise. Slug/git mismatches are easy to miss in daily use; run `br doctor` in CI.
 
-## AI アシスタントとの連携例
+## AI assistant workflow
 
-Claude や Cursor に次のように依頼するだけで、裏側でこの CLI が実行されます:
+Ask Claude or Cursor something like:
 
-> 「直近の Bitrise ビルドが落ちてないか確認して、落ちてたらログを解析して修正案を出して」
+> Check whether the latest Bitrise build failed; if it did, analyze the logs and suggest fixes.
 
 ```bash
-# Claude/Cursor が実行するコマンドの流れ
 br build list --limit 1 --json status,buildNumber
 br build logs 123 --failed-only
 ```
 
-## 設定ファイル
+## Config files
 
-`~/.config/br/config.yml` にはトークンのみ保存します。アプリ slug はプロジェクトの `.br.yml` に置きます（チーム共有・モノレポ単位の切り替えのためコミット推奨）。
+`~/.config/br/config.yml` stores the token only. App slugs live in project `.br.yml` (commit recommended for team sharing and monorepo switching).
 
 ```yaml
 token: <your-token>
 ```
 
-> **セキュリティ注記**: トークンはパーミッション `0600`（本人のみ読み書き可）の平文で保存されます。`gh` などと同様、OS キーチェーンによる暗号化は行いません。共有マシンでは環境変数 `BITRISE_API_TOKEN` の利用を推奨します。
+> **Security note**: Tokens are stored in plain text with mode `0600` (owner read/write only). Like `gh`, there is no OS keychain encryption. On shared machines, prefer the `BITRISE_API_TOKEN` environment variable.

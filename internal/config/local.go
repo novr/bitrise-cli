@@ -86,6 +86,10 @@ func findLocalConfigFrom(startDir string) (*LocalConfig, string, error) {
 }
 
 func WriteLocalConfig(dir, app string) (string, error) {
+	app = strings.TrimSpace(app)
+	if app == "" {
+		return "", fmt.Errorf("app slug must not be empty")
+	}
 	path := filepath.Join(dir, LocalConfigFileName)
 	data, err := yaml.Marshal(&LocalConfig{App: app})
 	if err != nil {
