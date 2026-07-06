@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents working in this repository.
 
 ## Commands
 
@@ -45,11 +45,13 @@ cmd/                   # Cobra command definitions (one file per command group)
   build_logs.go        # br build logs <number>
   logparse.go          # shared Bitrise-log step parsing (view + logs --failed-only)
   jsonout.go           # shared --json field validation + output (build/app list)
-  config.go            # br config show / set-default-app
+  config.go            # br config show / set app
+  doctor.go            # br doctor
   version.go           # br version
 internal/
   api/client.go        # Bitrise REST API client (https://api.bitrise.io/v0.1)
   config/config.go     # ~/.config/br/config.yml read/write
+  config/local.go      # .br.yml discovery (cwd → git root)
 ```
 
 `Execute()` (root.go) installs a `signal.NotifyContext` and runs `ExecuteContext`; every API method takes a `context.Context` (from `cmd.Context()`) so Ctrl+C cancels in-flight requests and retry backoff.
@@ -59,10 +61,12 @@ internal/
 **App slug resolution** (`cmd/build.go: resolveAppSlug`) — every build command needs a Bitrise "app slug". Resolution priority:
 1. `--app` flag
 2. `BITRISE_APP_SLUG` env var
-3. Git remote URL matched against the user's Bitrise apps via API
-4. `default_app` in `~/.config/br/config.yml`
+3. `.br.yml` (walk cwd → git root via `config.FindLocalConfig`)
+4. Git remote URL matched against the user's Bitrise apps via API
 
-If an `origin` remote exists but matches no accessible app, this is a hard error (not a fallback to `default_app`) to avoid silently targeting the wrong app — see the `errNoGitRemote` sentinel in `cmd/build.go`.
+If an `origin` remote exists but matches no accessible app, this is a hard error — see the `errNoGitRemote` sentinel in `cmd/build.go` (benign: no git / no origin; local `.br.yml` can still supply the slug).
+
+**Local config** (`internal/config/local.go`) — `.br.yml` holds `app: <slug>` only. Empty `app` skips to parent. Outside a git repo, only cwd is checked. `br config set app` writes to cwd; `br doctor` validates resolution and warns on slug/git mismatch.
 
 **Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_API_TOKEN` (or legacy `BITRISE_TOKEN`) env var beats the stored config, enabling CI/script use. Note: workspace API tokens (`bitwat_…`) cannot access `/me` or `/me/apps`, so the client uses `/apps` and validates via `Client.Verify`.
 

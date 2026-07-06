@@ -38,8 +38,8 @@ func newAPIClient() (*api.Client, error) {
 // resolveAppSlug determines the Bitrise app slug to use, in priority order:
 //  1. --app flag
 //  2. BITRISE_APP_SLUG environment variable
-//  3. Git remote URL matched against user's Bitrise apps
-//  4. default_app in config
+//  3. .br.yml (cwd upward to git root)
+//  4. Git remote URL matched against user's Bitrise apps
 func resolveAppSlug(ctx context.Context, cmd *cobra.Command, client *api.Client) (string, error) {
 	if slug, _ := cmd.Flags().GetString("app"); slug != "" {
 		return slug, nil
@@ -47,27 +47,24 @@ func resolveAppSlug(ctx context.Context, cmd *cobra.Command, client *api.Client)
 	if slug := os.Getenv("BITRISE_APP_SLUG"); slug != "" {
 		return slug, nil
 	}
+	if local, _, err := config.FindLocalConfig(); err != nil {
+		return "", err
+	} else if local != nil && local.App != "" {
+		return local.App, nil
+	}
 	slug, err := detectAppFromGit(ctx, client)
 	if err == nil {
 		return slug, nil
 	}
-	// A remote that exists but matches no app is fatal: falling back to
-	// default_app here would silently target the wrong app.
 	if !errors.Is(err, errNoGitRemote) {
 		return "", err
 	}
-
-	cfg, cfgErr := config.Load()
-	if cfgErr == nil && cfg.DefaultApp != "" {
-		return cfg.DefaultApp, nil
-	}
-	return "", fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, or run from a git repo connected to Bitrise")
+	return "", fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, run br config set app <slug>, or run from a git repo connected to Bitrise")
 }
 
 // errNoGitRemote means git-based detection could not run for a benign reason
-// (git absent, not a repo, or no origin remote), so falling back to default_app
-// is safe. Unexpected git failures (corruption, permissions) are surfaced
-// instead, so they can't silently resolve to the wrong app.
+// (git absent, not a repo, or no origin remote) and no .br.yml supplied an app.
+// Unexpected git failures (corruption, permissions) are surfaced instead.
 var errNoGitRemote = errors.New("no git remote")
 
 func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {

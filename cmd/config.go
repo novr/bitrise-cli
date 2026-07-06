@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/novr/bitrise-cli/internal/api"
 	"github.com/novr/bitrise-cli/internal/config"
@@ -14,13 +16,19 @@ var configCmd = &cobra.Command{
 	Short: "Manage br configuration",
 }
 
+var configSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "Set configuration values",
+}
+
 func init() {
-	configCmd.AddCommand(&cobra.Command{
-		Use:   "set-default-app <app-slug>",
-		Short: "Set the default app used when git detection can't identify one",
+	configSetCmd.AddCommand(&cobra.Command{
+		Use:   "app <app-slug>",
+		Short: "Write app slug to .br.yml in the current directory",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runConfigSetDefaultApp,
+		RunE:  runConfigSetApp,
 	})
+	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(&cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
@@ -29,25 +37,24 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 }
 
-func runConfigSetDefaultApp(cmd *cobra.Command, args []string) error {
+func runConfigSetApp(cmd *cobra.Command, args []string) error {
 	slug := args[0]
 
-	// Validate the slug against the API when auth is available.
 	if client, err := newAPIClient(); err == nil {
 		if _, err := client.ListBuilds(cmd.Context(), slug, api.ListBuildsParams{Limit: 1}); err != nil {
 			return fmt.Errorf("app slug %q not found or not accessible: %w", slug, err)
 		}
 	}
 
-	cfg, err := config.Load()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	cfg.DefaultApp = slug
-	if err := config.Save(cfg); err != nil {
+	path, err := config.WriteLocalConfig(cwd, slug)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("✓ default app set to %s\n", slug)
+	fmt.Printf("✓ wrote app to %s\n", path)
 	return nil
 }
 
@@ -57,8 +64,6 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// Use GetToken so env-var auth (BITRISE_API_TOKEN) is reflected, not just
-	// the stored token.
 	authed := "no"
 	source := ""
 	if _, err := config.GetToken(); err == nil {
@@ -69,8 +74,27 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Config file:   %s\n", path)
 	fmt.Printf("Authenticated: %s%s\n", authed, source)
-	fmt.Printf("Default app:   %s\n", orNone(cfg.DefaultApp))
+
+	local, localPath, err := config.FindLocalConfig()
+	if err != nil {
+		return err
+	}
+	if local != nil && local.App != "" {
+		fmt.Printf("Local config:  %s\n", localPath)
+		fmt.Printf("App:           %s\n", local.App)
+	} else {
+		fmt.Printf("Local config:  (none)\n")
+		fmt.Printf("App:           (none)\n")
+	}
 	return nil
+}
+
+func localConfigCwdPath() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, config.LocalConfigFileName), nil
 }
 
 func orNone(s string) string {

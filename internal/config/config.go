@@ -9,8 +9,7 @@ import (
 )
 
 type Config struct {
-	Token      string `yaml:"token"`
-	DefaultApp string `yaml:"default_app,omitempty"`
+	Token string `yaml:"token"`
 }
 
 func configPath() (string, error) {
