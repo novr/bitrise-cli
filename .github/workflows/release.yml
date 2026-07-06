@@ -188,7 +188,7 @@ jobs:
 
       - name: Create GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.NOVRD_BOT_APP_ID }}
           private-key: ${{ secrets.NOVRD_BOT_KEY }}
@@ -252,7 +252,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download Linux assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: dist
           pattern: br-linux-*
