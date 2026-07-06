@@ -43,8 +43,7 @@ func init() {
 }
 
 // readLoginToken obtains the PAT either from stdin (--with-token, for
-// pipes/CI) or via an interactive hidden prompt. The browser is opened only
-// for the interactive path on a real terminal.
+// pipes/CI) or via an interactive hidden prompt.
 func readLoginToken(cmd *cobra.Command, withToken bool) (string, error) {
 	if withToken {
 		data, err := io.ReadAll(cmd.InOrStdin())

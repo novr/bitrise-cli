@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/novr/bitrise-cli/internal/api"
 	"github.com/novr/bitrise-cli/internal/config"
 
 	"github.com/spf13/cobra"
@@ -29,15 +30,24 @@ func init() {
 }
 
 func runConfigSetDefaultApp(cmd *cobra.Command, args []string) error {
+	slug := args[0]
+
+	// Validate the slug against the API when auth is available.
+	if client, err := newAPIClient(); err == nil {
+		if _, err := client.ListBuilds(cmd.Context(), slug, api.ListBuildsParams{Limit: 1}); err != nil {
+			return fmt.Errorf("app slug %q not found or not accessible: %w", slug, err)
+		}
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-	cfg.DefaultApp = args[0]
+	cfg.DefaultApp = slug
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
-	fmt.Printf("✓ default app set to %s\n", args[0])
+	fmt.Printf("✓ default app set to %s\n", slug)
 	return nil
 }
 

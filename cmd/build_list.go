@@ -122,6 +122,7 @@ func printBuildsTable(builds []api.Build, appSlug string) error {
 func buildToFieldMap(b api.Build) map[string]interface{} {
 	return map[string]interface{}{
 		"status":          b.StatusText,
+		"statusCode":      int(b.Status),
 		"buildNumber":     b.BuildNumber,
 		"branch":          b.Branch,
 		"workflow":        b.TriggeredWorkflow,

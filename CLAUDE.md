@@ -66,7 +66,7 @@ If an `origin` remote exists but matches no accessible app, this is a hard error
 
 **Token resolution** (`internal/config/config.go: GetToken`) — `BITRISE_API_TOKEN` (or legacy `BITRISE_TOKEN`) env var beats the stored config, enabling CI/script use. Note: workspace API tokens (`bitwat_…`) cannot access `/me` or `/me/apps`, so the client uses `/apps` and validates via `Client.Verify`.
 
-**Build status** (`internal/api: BuildStatus`) — the API's numeric status codes are a named type with constants (`StatusRunning=0 … StatusAborted=4`); never compare `build.Status` against bare ints. Status filtering is an optional `*BuildStatus` (nil = no filter), not a sentinel string.
+**Build status** (`internal/api: BuildStatus`) — the API's numeric status codes are a named type with constants (`StatusRunning=0 … StatusAborted=3`); never compare `build.Status` against bare ints. Status filtering is an optional `*BuildStatus` (nil = no filter), not a sentinel string.
 
 **`--json` flag** — `--json field1,field2` outputs a subset; `--json all` (or `*`) outputs every field. Field names are camelCase (`buildNumber`, `commitMessage`, etc.) and validated in `parseJSONFields` — unknown names error out. Note: this is a normal string flag (no `NoOptDefVal`), so the field list must follow as a separate token (`--json status,branch`) — that is intentional, since an optional-value flag would swallow the space-separated field list as a positional arg.
 

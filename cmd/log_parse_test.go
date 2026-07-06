@@ -168,6 +168,35 @@ Bitrise build failed (exit code: 1)
 	}
 }
 
+// Steps that fail without printing an "exit code:" line cannot be detected.
+// This is a known limitation of best-effort log parsing.
+func TestParseLogStepsNoExitCodeLine(t *testing.T) {
+	const log = `
++---+
+| (1) script@1 |
++---+
+Doing something...
+fatal: repository not found
+
++---+
+| (2) deploy@1 |
++---+
+Deploying...
+exit code: 0
+`
+	steps := parseLogSteps(log)
+	if len(steps) != 2 {
+		t.Fatalf("got %d steps, want 2", len(steps))
+	}
+	// The first step failed but printed no exit code — it shows as exit 0.
+	if steps[0].ExitCode != 0 {
+		t.Errorf("step[0] ExitCode = %d, want 0 (no exit code line)", steps[0].ExitCode)
+	}
+	if n := len(failedSteps(steps)); n != 0 {
+		t.Errorf("failedSteps = %d, want 0 (undetectable without exit code line)", n)
+	}
+}
+
 func stepNames(steps []logStep) []string {
 	names := make([]string, len(steps))
 	for i, s := range steps {

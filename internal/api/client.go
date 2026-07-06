@@ -16,10 +16,12 @@ import (
 const defaultBaseURL = "https://api.bitrise.io/v0.1"
 
 // Version is the br CLI version, surfaced via `br version` and the User-Agent.
-const Version = "0.1.0"
+// Set at build time via -ldflags "-X github.com/novr/bitrise-cli/internal/api.Version=<tag>".
+var Version = "dev"
 
 // userAgent identifies br in Bitrise's traffic logs (helps support triage).
-const userAgent = "br-cli/" + Version
+// Evaluated at first use so it picks up the ldflags-injected Version.
+func userAgent() string { return "br-cli/" + Version }
 
 type Client struct {
 	token      string
@@ -127,7 +129,7 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values)
 		}
 		req.Header.Set("Authorization", c.token)
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", userAgent)
+		req.Header.Set("User-Agent", userAgent())
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -309,7 +311,7 @@ func (c *Client) DownloadRawLog(ctx context.Context, rawURL string) (string, err
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", userAgent())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
