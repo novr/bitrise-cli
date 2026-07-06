@@ -198,33 +198,12 @@ jobs:
       - name: Dispatch homebrew formula update
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          FORMULA_EVENT: ${{ vars.HOMEBREW_FORMULA_EVENT || 'add-formula' }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${FORMULA_EVENT}" == "add-formula" ]]; then
-            gh api repos/novr/homebrew-taps/dispatches \
-              --method POST \
-              --input - <<EOF
-          {
-            "event_type": "add-formula",
-            "client_payload": {
-              "formula": "br",
-              "version": "${{ needs.prepare.outputs.version }}",
-              "url": "${{ steps.package.outputs.url }}",
-              "sha256": "${{ steps.package.outputs.sha256 }}",
-              "source_repo": "novr/bitrise-cli",
-              "desc": "Unofficial Bitrise CLI for build history and logs",
-              "homepage": "https://github.com/novr/bitrise-cli",
-              "binary": "br",
-              "test_match": "Bitrise CLI"
-            }
-          }
-          EOF
-          else
-            gh api repos/novr/homebrew-taps/dispatches \
-              --method POST \
-              --input - <<EOF
+          gh api repos/novr/homebrew-taps/dispatches \
+            --method POST \
+            --input - <<EOF
           {
             "event_type": "update-formula",
             "client_payload": {
@@ -232,12 +211,14 @@ jobs:
               "version": "${{ needs.prepare.outputs.version }}",
               "url": "${{ steps.package.outputs.url }}",
               "sha256": "${{ steps.package.outputs.sha256 }}",
-              "source_repo": "novr/bitrise-cli",
-              "binary": "br"
+              "source_repo": "${{ github.repository }}",
+              "desc": "Unofficial Bitrise CLI for build history and logs",
+              "homepage": "https://github.com/${{ github.repository }}",
+              "binary": "br",
+              "test_match": "Bitrise CLI"
             }
           }
           EOF
-          fi
 
   release-linux:
     needs: [prepare, build-linux, release-macos]
