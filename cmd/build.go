@@ -35,39 +35,67 @@ func newAPIClient() (*api.Client, error) {
 	return api.NewClient(token), nil
 }
 
-// resolveAppSlug determines the Bitrise app slug to use, in priority order:
-//  1. --app flag
-//  2. BITRISE_APP_SLUG environment variable
-//  3. Git remote URL matched against user's Bitrise apps
-//  4. default_app in config
+// resolveAppSlug picks an app from explicit sources only (global default_app was
+// removed to prevent silently targeting the wrong app in multi-repo setups).
 func resolveAppSlug(ctx context.Context, cmd *cobra.Command, client *api.Client) (string, error) {
-	if slug, _ := cmd.Flags().GetString("app"); slug != "" {
-		return slug, nil
-	}
-	if slug := os.Getenv("BITRISE_APP_SLUG"); slug != "" {
-		return slug, nil
-	}
-	slug, err := detectAppFromGit(ctx, client)
-	if err == nil {
-		return slug, nil
-	}
-	// A remote that exists but matches no app is fatal: falling back to
-	// default_app here would silently target the wrong app.
-	if !errors.Is(err, errNoGitRemote) {
-		return "", err
-	}
-
-	cfg, cfgErr := config.Load()
-	if cfgErr == nil && cfg.DefaultApp != "" {
-		return cfg.DefaultApp, nil
-	}
-	return "", fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, or run from a git repo connected to Bitrise")
+	res, err := resolveAppSlugDetailed(ctx, cmd, client, false)
+	return res.Slug, err
 }
 
-// errNoGitRemote means git-based detection could not run for a benign reason
-// (git absent, not a repo, or no origin remote), so falling back to default_app
-// is safe. Unexpected git failures (corruption, permissions) are surfaced
-// instead, so they can't silently resolve to the wrong app.
+type appResolution struct {
+	Slug      string
+	LocalPath string
+	GitSlug   string
+	GitErr    error
+}
+
+// probeGit forces git detection even when .br.yml wins, so doctor can compare slugs
+// without duplicating the priority chain.
+func resolveAppSlugDetailed(ctx context.Context, cmd *cobra.Command, client *api.Client, probeGit bool) (appResolution, error) {
+	var res appResolution
+
+	if slug, _ := cmd.Flags().GetString("app"); slug != "" {
+		res.Slug = slug
+		return res, nil
+	}
+	if slug := os.Getenv("BITRISE_APP_SLUG"); slug != "" {
+		res.Slug = slug
+		return res, nil
+	}
+
+	local, path, err := config.FindLocalConfig()
+	if err != nil {
+		return res, err
+	}
+
+	if probeGit && client != nil {
+		res.GitSlug, res.GitErr = detectAppFromGit(ctx, client)
+	}
+
+	if local != nil && local.App != "" {
+		res.Slug = local.App
+		res.LocalPath = path
+		return res, nil
+	}
+
+	if !probeGit && client != nil {
+		res.GitSlug, res.GitErr = detectAppFromGit(ctx, client)
+	} else if client == nil {
+		res.GitErr = errNoGitRemote
+	}
+
+	if res.GitErr == nil {
+		res.Slug = res.GitSlug
+		return res, nil
+	}
+	if !errors.Is(res.GitErr, errNoGitRemote) {
+		return res, res.GitErr
+	}
+	return res, fmt.Errorf("could not determine Bitrise app\nTip: use --app <slug>, set BITRISE_APP_SLUG, run br config set app <slug>, or run from a git repo connected to Bitrise")
+}
+
+// errNoGitRemote distinguishes "nothing to detect from" from real git failures;
+// only the former may fall through to "could not determine app".
 var errNoGitRemote = errors.New("no git remote")
 
 func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
@@ -96,22 +124,17 @@ func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
 	return "", fmt.Errorf("git remote %s is not connected to any Bitrise app you can access; use --app <slug> to override", remoteURL)
 }
 
-// isBenignGitError reports whether a git failure just means "no remote to
-// detect from" (git missing, not a repo, or origin unset) rather than a real
-// problem worth surfacing.
 func isBenignGitError(err error, stderr string) bool {
 	if errors.Is(err, exec.ErrNotFound) {
-		return true // git not installed
+		return true
 	}
 	s := strings.ToLower(stderr)
-	// exit 2 = "no such remote" (origin unset): unambiguously benign, and
-	// locale-independent.
+	// exit 2: "no such remote" — locale-independent, unlike parsing stderr text.
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
 		return true
 	}
-	// 128 is overloaded (not-a-repo, but also permission/corruption), so require
-	// stderr to confirm a benign cause rather than blanket-trusting the code.
+	// exit 128 covers both "not a repo" and permission errors; require stderr proof.
 	return strings.Contains(s, "not a git repository") ||
 		strings.Contains(s, "no such remote") ||
 		strings.Contains(s, "no such file")
@@ -129,9 +152,8 @@ func normalizeGitURL(rawURL string) string {
 	return strings.TrimPrefix(u, "www.")
 }
 
-// statusDisplay returns an icon plus a label. The label comes from the API's
-// status_text (authoritative) so it never drifts from the numeric code; the
-// icon is derived from the numeric status.
+// statusDisplay uses status_text for the label (API-authoritative) and derives
+// the icon from the numeric code so the two never drift.
 func statusDisplay(b api.Build) (icon, text string) {
 	switch b.Status {
 	case api.StatusSuccess:

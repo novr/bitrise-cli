@@ -5,14 +5,17 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/novr/bitrise-cli/internal/api"
+	"github.com/novr/bitrise-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
-// Outside a git repo, detection must return the errNoGitRemote sentinel so that
-// resolveAppSlug is allowed to fall back to default_app (rather than erroring).
+// errNoGitRemote must be returned here so resolveAppSlug can tell benign
+// "no remote" apart from errors that should abort immediately.
 func TestDetectAppFromGitNoRemote(t *testing.T) {
 	orig, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(orig) })
@@ -22,6 +25,63 @@ func TestDetectAppFromGitNoRemote(t *testing.T) {
 	_, err := detectAppFromGit(context.Background(), nil)
 	if !errors.Is(err, errNoGitRemote) {
 		t.Errorf("detectAppFromGit outside a repo = %v, want errNoGitRemote", err)
+	}
+}
+
+func TestResolveAppSlugLocalOverGit(t *testing.T) {
+	root := initTestGitRepo(t)
+	if err := os.WriteFile(filepath.Join(root, config.LocalConfigFileName), []byte("app: local-app\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGitInDir(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+
+	orig, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.Flags().String("app", "", "")
+	slug, err := resolveAppSlug(context.Background(), cmd, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slug != "local-app" {
+		t.Fatalf("slug = %q, want local-app", slug)
+	}
+}
+
+func TestResolveAppSlugNoSource(t *testing.T) {
+	orig, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.Flags().String("app", "", "")
+	_, err := resolveAppSlug(context.Background(), cmd, nil)
+	if err == nil {
+		t.Fatal("expected error when no app source available")
+	}
+}
+
+func initTestGitRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	runGitInDir(t, dir, "init")
+	runGitInDir(t, dir, "config", "user.email", "test@example.com")
+	runGitInDir(t, dir, "config", "user.name", "test")
+	return dir
+}
+
+func runGitInDir(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, out)
 	}
 }
 
@@ -36,11 +96,9 @@ func TestIsBenignGitError(t *testing.T) {
 			t.Errorf("isBenignGitError(%q) = false, want true", s)
 		}
 	}
-	// Git present but a real failure (e.g. permissions) must NOT be treated as benign.
 	if isBenignGitError(errors.New("exit status 128"), "fatal: could not read Username: Permission denied") {
 		t.Error("permission error classified as benign; should surface")
 	}
-	// Missing git binary is benign (can't detect; fall back).
 	if !isBenignGitError(exec.ErrNotFound, "") {
 		t.Error("exec.ErrNotFound should be benign")
 	}
@@ -181,7 +239,6 @@ func TestTruncate(t *testing.T) {
 	if got := truncate("line1\nline2", 20); got != "line1 line2" {
 		t.Errorf("truncate newline = %q, want %q", got, "line1 line2")
 	}
-	// Over limit keeps n-1 runes plus the ellipsis.
 	got := truncate("abcdefghij", 5)
 	if []rune(got)[len([]rune(got))-1] != '…' {
 		t.Errorf("truncate over limit = %q, want trailing ellipsis", got)
@@ -189,7 +246,6 @@ func TestTruncate(t *testing.T) {
 	if n := len([]rune(got)); n != 5 {
 		t.Errorf("truncate over limit rune count = %d, want 5", n)
 	}
-	// Multi-byte runes must not be split mid-byte.
 	jp := truncate("あいうえおかきくけこ", 4)
 	if n := len([]rune(jp)); n != 4 {
 		t.Errorf("truncate multibyte rune count = %d, want 4", n)
