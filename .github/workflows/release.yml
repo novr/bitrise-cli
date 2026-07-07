@@ -186,39 +186,20 @@ jobs:
               ${PRERELEASE_FLAG}
           fi
 
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.NOVRD_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.NOVRD_BOT_KEY }}
-          owner: novr
-          repositories: homebrew-taps
-
-      - name: Dispatch homebrew formula update
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api repos/novr/homebrew-taps/dispatches \
-            --method POST \
-            --input - <<EOF
-          {
-            "event_type": "update-formula",
-            "client_payload": {
-              "formula": "br",
-              "version": "${{ needs.prepare.outputs.version }}",
-              "url": "${{ steps.package.outputs.url }}",
-              "sha256": "${{ steps.package.outputs.sha256 }}",
-              "source_repo": "${{ github.repository }}",
-              "desc": "Unofficial Bitrise CLI for build history and logs",
-              "homepage": "https://github.com/${{ github.repository }}",
-              "binary": "br",
-              "test_match": "Bitrise CLI"
-            }
-          }
-          EOF
+  dispatch-formula:
+    needs: [prepare, release-macos]
+    uses: novr/homebrew-taps/.github/workflows/dispatch-formula.yml@03167f7bb20a18f2c4692e5b90e5194940ce13fb
+    with:
+      formula: br
+      version: ${{ needs.prepare.outputs.version }}
+      url: ${{ needs.release-macos.outputs.url }}
+      sha256: ${{ needs.release-macos.outputs.sha256 }}
+      desc: "Unofficial Bitrise CLI for build history and logs"
+      binary: br
+      test_match: "Bitrise CLI"
+    secrets:
+      NOVRD_BOT_CLIENT_ID: ${{ secrets.NOVRD_BOT_CLIENT_ID }}
+      NOVRD_BOT_KEY: ${{ secrets.NOVRD_BOT_KEY }}
 
   release-linux:
     needs: [prepare, build-linux, release-macos]
