@@ -171,6 +171,15 @@ monorepo/
 
 Run `br config set app <slug>` to write the file in the current directory. Use `--app` when the fork's origin does not match Bitrise. Slug/git mismatches are easy to miss in daily use; run `br doctor` in CI.
 
+## Agent skill (Cursor / Claude)
+
+Install the `br` skill so agents know how to use this CLI (requires this repo on GitHub):
+
+```bash
+npx skills add novr/bitrise-cli --skill br -g -y   # global (~/.cursor/skills/, etc.)
+npx skills add novr/bitrise-cli --skill br -y      # project-local only
+```
+
 ## AI assistant workflow
 
 Ask Claude or Cursor something like:

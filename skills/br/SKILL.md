@@ -1,0 +1,119 @@
+---
+name: br
+description: >-
+  Use the br CLI to inspect Bitrise CI builds, fetch logs, and diagnose failures.
+  Use when investigating Bitrise build status, analyzing CI failures, fetching
+  build logs with --failed-only, resolving app slugs, running br doctor, or when
+  the user mentions Bitrise, br build, or .br.yml.
+---
+
+# br — Bitrise CLI for agents
+
+`br` is a `gh`-style CLI for Bitrise. Prefer **`--json` output** for inspection; use human commands (`build view`) only for short summaries.
+
+## Prerequisites
+
+```bash
+brew install novr/taps/br          # macOS
+go install github.com/novr/bitrise-cli/cmd/br@latest
+```
+
+Linux: download from [GitHub Releases](https://github.com/novr/bitrise-cli/releases).
+
+**Auth** — env vars beat `~/.config/br/config.yml`:
+
+```bash
+export BITRISE_API_TOKEN=<token>   # preferred; BITRISE_TOKEN also works
+echo "$BITRISE_API_TOKEN" | br auth login --with-token   # CI / scripts
+br auth status
+```
+
+Token: [Bitrise Personal Access Token](https://app.bitrise.io/me/profile#/security). Workspace API tokens work; `br auth login` greeting may skip `/me` but `Client.Verify` uses `GET /apps?limit=1`.
+
+When auth or app resolution fails, run `br doctor` first (exits non-zero if issues remain — suitable for CI).
+
+## App slug resolution
+
+Build commands need a Bitrise app slug. Priority:
+
+1. `--app <slug>`
+2. `BITRISE_APP_SLUG`
+3. `.br.yml` (`app:` key) — walk cwd → git root
+4. `git remote get-url origin` matched against Bitrise apps
+
+If origin matches no accessible app, the command **errors** (no silent fallback). Pin with `br config set app <slug>` or `--app`.
+
+```bash
+br config show
+br config set app <app-slug>   # writes .br.yml in cwd
+br doctor                      # auth + resolution + API reachability
+br doctor --app <slug>         # override slug for diagnosis only
+```
+
+## Standard workflow
+
+```bash
+# 1. Latest build (structured)
+br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
+
+# 2. If failed — errors only (smaller than full log)
+br build logs <buildNumber> --failed-only
+
+# 3. Optional human summary (no --json; may fetch log for failed builds)
+br build view <buildNumber>
+```
+
+`build logs` and `build view` take **build number** (`#123`), not build slug.
+
+### Status filters (`build list --status`)
+
+`success`, `running`, `aborted`, and any of `failed` / `failure` / `error` (all map to Bitrise status code 2).
+
+### JSON `status` vs `statusCode`
+
+`--json status` mirrors Bitrise `status_text` (failed builds often show `"error"`). For programmatic checks, use `statusCode`: `0=running`, `1=success`, `2=failed/error`, `3=aborted`.
+
+**Build list fields:** `branch`, `buildNumber`, `commitHash`, `commitMessage`, `durationSeconds`, `finishedAt`, `slug`, `status`, `statusCode`, `triggeredAt`, `workflow` — or `all` / `*`.
+
+**App list fields:** `repoURL`, `slug`, `title` — or `all` / `*`.
+
+`--json` takes a **separate token** (not `=`):
+
+```bash
+br build list --limit 3 --json status,buildNumber,branch,workflow
+br app list --json slug,title,repoURL
+```
+
+Unknown field names error with the valid list.
+
+## Commands
+
+| Command | Notes |
+|---------|-------|
+| `br build list` | `--limit`, `--branch`, `--workflow`, `--status`, `--json` |
+| `br build view <n>` | Human output only |
+| `br build logs <n>` | Full log; `--failed-only` for failed steps |
+| `br app list` | Apps visible to the token; `--json` |
+| `br config show` | Token config + effective `.br.yml` |
+| `br doctor` | Diagnostics; non-zero exit on failure |
+| `br auth login` / `logout` / `status` | Token management |
+| `br version` | CLI version |
+
+## `.br.yml` and monorepos
+
+```yaml
+app: <app-slug>
+```
+
+Discovery walks up to **git root** (not `bitrise.yml`). Subpackages can override with a nearer `.br.yml`. `br doctor` warns when `.br.yml` slug disagrees with git-detected slug.
+
+Global config stores **token only**; app slugs belong in `.br.yml` (commit for team sharing).
+
+## Agent tips
+
+- Run from the **target project directory** (or pass `--app` / set `BITRISE_APP_SLUG`).
+- Prefer `--failed-only` over full logs when analyzing failures.
+- `--failed-only` is **best-effort**: it parses Bitrise step headers. On parse failure, stderr says to re-run without the flag; empty output may mean no failures or an unparseable log format.
+- **Running builds:** `build logs` returns whatever log chunks exist so far (not a live stream). Re-run to refresh; partial output is prefixed when still running.
+- `build view` and `--failed-only` share `parseLogSteps` — step names stay consistent.
+- Ctrl+C cancels in-flight API calls (`signal.NotifyContext` on root command).
