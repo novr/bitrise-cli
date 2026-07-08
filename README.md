@@ -90,6 +90,21 @@ br build list --limit 3 --json status,buildNumber,branch,workflow
 
 ```bash
 br build view 123
+br build view 123 --json status,buildNumber,failedSteps
+```
+
+```json
+{
+  "status": "error",
+  "buildNumber": 123,
+  "failedSteps": [{"name": "run-xcode-tests@2.4.1", "exitCode": 1}]
+}
+```
+
+Human output example:
+
+```bash
+br build view 123
 # ✗ failed  #123  deploy  (branch: feature/auth)
 #   Commit:    add-login  (abc1234)
 #   Triggered: 15m ago
