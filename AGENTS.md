@@ -43,7 +43,7 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **Build status** (`internal/api: BuildStatus`) — Named constants (`StatusRunning=0 … StatusAborted=3`); never compare bare ints. Filters use `*BuildStatus` (nil = no filter).
 
-**`--json` flag** — Normal string flag (no `NoOptDefVal`) so the field list stays a separate token; an optional-value flag would swallow `status,branch` as a positional arg.
+**`--json` flag** — Normal string flag (no `NoOptDefVal`) so the field list stays a separate token; an optional-value flag would swallow `status,branch` as a positional arg. `build view --json` emits a single object and adds `failedSteps`; log is fetched only when that field is requested (or with `all`).
 
 **Log parsing** (`cmd/logparse.go: parseLogSteps`) — Shared by `build view` and `build logs --failed-only` so step summaries and filtered logs never disagree. Best-effort; depends on Bitrise log format.
 

@@ -63,3 +63,23 @@ func printJSON(rows []map[string]interface{}, requested map[string]bool) error {
 	fmt.Println(string(out))
 	return nil
 }
+
+// printJSONObject marshals one object to indented JSON, keeping only requested
+// fields (nil/empty requested = all fields).
+func printJSONObject(row map[string]interface{}, requested map[string]bool) error {
+	if len(requested) > 0 {
+		filtered := map[string]interface{}{}
+		for k, v := range row {
+			if requested[k] {
+				filtered[k] = v
+			}
+		}
+		row = filtered
+	}
+	out, err := json.MarshalIndent(row, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
+	return nil
+}

@@ -9,7 +9,7 @@ description: >-
 
 # br — Bitrise CLI for agents
 
-`br` is a `gh`-style CLI for Bitrise. Prefer **`--json` output** for inspection; use human commands (`build view`) only for short summaries.
+`br` is a `gh`-style CLI for Bitrise. Prefer **`--json` output** for inspection.
 
 ## Prerequisites
 
@@ -59,8 +59,8 @@ br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
 # 2. If failed — errors only (smaller than full log)
 br build logs <buildNumber> --failed-only
 
-# 3. Optional human summary (no --json; may fetch log for failed builds)
-br build view <buildNumber>
+# 3. Optional detail with failed steps (single object, not an array)
+br build view <buildNumber> --json status,buildNumber,failedSteps
 ```
 
 `build logs` and `build view` take **build number** (`#123`), not build slug.
@@ -74,6 +74,8 @@ br build view <buildNumber>
 `--json status` mirrors Bitrise `status_text` (failed builds often show `"error"`). For programmatic checks, use `statusCode`: `0=running`, `1=success`, `2=failed/error`, `3=aborted`.
 
 **Build list fields:** `branch`, `buildNumber`, `commitHash`, `commitMessage`, `durationSeconds`, `finishedAt`, `slug`, `status`, `statusCode`, `triggeredAt`, `workflow` — or `all` / `*`.
+
+**Build view fields:** same as list plus `failedSteps` (`[{name, exitCode}]`). Log is fetched only when `failedSteps` is requested (or with `all`). Output is a single JSON object.
 
 **App list fields:** `repoURL`, `slug`, `title` — or `all` / `*`.
 
@@ -91,7 +93,7 @@ Unknown field names error with the valid list.
 | Command | Notes |
 |---------|-------|
 | `br build list` | `--limit`, `--branch`, `--workflow`, `--status`, `--json` |
-| `br build view <n>` | Human output only |
+| `br build view <n>` | `--json`; includes `failedSteps` on failed builds |
 | `br build logs <n>` | Full log; `--failed-only` for failed steps |
 | `br app list` | Apps visible to the token; `--json` |
 | `br config show` | Token config + effective `.br.yml` |
