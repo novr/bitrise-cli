@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const fieldFailedSteps = "failedSteps"
+
 func init() {
 	cmd := &cobra.Command{
 		Use:   "view <build-number>",
@@ -68,7 +70,7 @@ func buildViewToFieldMap(b api.Build, failed []logStep) map[string]interface{} {
 			"exitCode": s.ExitCode,
 		})
 	}
-	m["failedSteps"] = steps
+	m[fieldFailedSteps] = steps
 	return m
 }
 
@@ -80,7 +82,7 @@ func needsFailedStepLog(requested map[string]bool) bool {
 	if requested == nil {
 		return true
 	}
-	return requested["failedSteps"]
+	return requested[fieldFailedSteps]
 }
 
 func failedStepsForView(ctx context.Context, client *api.Client, appSlug string, build *api.Build, requested map[string]bool) []logStep {
@@ -112,7 +114,7 @@ func printBuildViewHuman(ctx context.Context, client *api.Client, appSlug string
 
 	if build.Status == api.StatusError {
 		fmt.Println()
-		for _, s := range failedStepsForView(ctx, client, appSlug, build, map[string]bool{"failedSteps": true}) {
+		for _, s := range failedStepsForView(ctx, client, appSlug, build, map[string]bool{fieldFailedSteps: true}) {
 			fmt.Printf("  ✗ Step failed: %s (exit code: %d)\n", s.Name, s.ExitCode)
 		}
 		fmt.Printf("\n  To see full logs:   br build logs %d\n", build.BuildNumber)

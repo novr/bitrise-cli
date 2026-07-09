@@ -42,19 +42,22 @@ func parseJSONFields(fields string, valid []string) (map[string]bool, error) {
 	return requested, nil
 }
 
-// printJSON marshals rows to indented JSON, keeping only requested fields
-// (nil/empty requested = all fields).
-func printJSON(rows []map[string]interface{}, requested map[string]bool) error {
-	if len(requested) > 0 {
-		for i, row := range rows {
-			filtered := map[string]interface{}{}
-			for k, v := range row {
-				if requested[k] {
-					filtered[k] = v
-				}
-			}
-			rows[i] = filtered
+func filterFields(row map[string]interface{}, requested map[string]bool) map[string]interface{} {
+	if len(requested) == 0 {
+		return row
+	}
+	filtered := map[string]interface{}{}
+	for k, v := range row {
+		if requested[k] {
+			filtered[k] = v
 		}
+	}
+	return filtered
+}
+
+func printJSON(rows []map[string]interface{}, requested map[string]bool) error {
+	for i, row := range rows {
+		rows[i] = filterFields(row, requested)
 	}
 	out, err := json.MarshalIndent(rows, "", "  ")
 	if err != nil {
@@ -64,19 +67,8 @@ func printJSON(rows []map[string]interface{}, requested map[string]bool) error {
 	return nil
 }
 
-// printJSONObject marshals one object to indented JSON, keeping only requested
-// fields (nil/empty requested = all fields).
 func printJSONObject(row map[string]interface{}, requested map[string]bool) error {
-	if len(requested) > 0 {
-		filtered := map[string]interface{}{}
-		for k, v := range row {
-			if requested[k] {
-				filtered[k] = v
-			}
-		}
-		row = filtered
-	}
-	out, err := json.MarshalIndent(row, "", "  ")
+	out, err := json.MarshalIndent(filterFields(row, requested), "", "  ")
 	if err != nil {
 		return err
 	}
