@@ -124,6 +124,38 @@ func detectAppFromGit(ctx context.Context, client *api.Client) (string, error) {
 	return "", fmt.Errorf("git remote %s is not connected to any Bitrise app you can access; use --app <slug> to override", remoteURL)
 }
 
+const branchCurrent = "@current"
+
+// resolveBranchFilter expands @current to the git HEAD branch name.
+func resolveBranchFilter(ctx context.Context, branch string) (string, error) {
+	branch = strings.TrimSpace(branch)
+	if branch != branchCurrent {
+		return branch, nil
+	}
+	return currentGitBranch(ctx)
+}
+
+func currentGitBranch(ctx context.Context) (string, error) {
+	gitCmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	var stderr bytes.Buffer
+	gitCmd.Stderr = &stderr
+	out, err := gitCmd.Output()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", fmt.Errorf("git not found in PATH: cannot resolve %s", branchCurrent)
+		}
+		if isBenignGitError(err, stderr.String()) {
+			return "", fmt.Errorf("not a git repository: cannot resolve %s", branchCurrent)
+		}
+		return "", fmt.Errorf("git branch lookup failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	name := strings.TrimSpace(string(out))
+	if name == "" || name == "HEAD" {
+		return "", fmt.Errorf("detached HEAD: cannot resolve %s", branchCurrent)
+	}
+	return name, nil
+}
+
 func isBenignGitError(err error, stderr string) bool {
 	if errors.Is(err, exec.ErrNotFound) {
 		return true

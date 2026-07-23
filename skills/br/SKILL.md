@@ -53,16 +53,19 @@ br doctor --app <slug>         # override slug for diagnosis only
 ## Standard workflow
 
 ```bash
-# 1. Latest build (structured)
+# 1. Latest build on current branch (structured)
+br build list --branch @current --limit 1 --json status,statusCode,buildNumber,branch,workflow
+
+# 2. Latest build (any branch)
 br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
 
-# 2. If still running — wait for completion
+# 3. If still running — wait for completion
 br build watch <buildNumber> --exit-status --json status,buildNumber,failedSteps
 
-# 3. If failed — errors only (smaller than full log)
+# 4. If failed — errors only (smaller than full log)
 br build logs <buildNumber> --failed-only
 
-# 4. Optional detail with failed steps (single object, not an array)
+# 5. Optional detail with failed steps (single object, not an array)
 br build view <buildNumber> --json status,buildNumber,failedSteps
 ```
 

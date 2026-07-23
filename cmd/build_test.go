@@ -73,6 +73,7 @@ func initTestGitRepo(t *testing.T) string {
 	runGitInDir(t, dir, "init")
 	runGitInDir(t, dir, "config", "user.email", "test@example.com")
 	runGitInDir(t, dir, "config", "user.name", "test")
+	runGitInDir(t, dir, "config", "commit.gpgsign", "false")
 	return dir
 }
 
