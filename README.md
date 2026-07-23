@@ -66,6 +66,7 @@ The Bitrise app is resolved from `--app`, `BITRISE_APP_SLUG`, `.br.yml`, or the 
 br build list
 br build list --limit 20
 br build list --branch main --status failed   # status: success/failed/error/running/aborted
+br build list --branch @current               # current git branch
 ```
 
 > If a git remote exists but matches no accessible Bitrise app, the command errors (to avoid targeting the wrong app). Override with `--app <slug>` or `.br.yml`.

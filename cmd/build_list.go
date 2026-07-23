@@ -15,13 +15,14 @@ func init() {
 		Short: "List recent builds",
 		Example: `  br build list
   br build list --limit 20 --branch main
+  br build list --branch @current
   br build list --json status,buildNumber,branch,workflow
   br build list --json all
   br build list --status failed`,
 		RunE: runBuildList,
 	}
 	cmd.Flags().IntP("limit", "n", 10, "Number of builds to show")
-	cmd.Flags().String("branch", "", "Filter by branch name")
+	cmd.Flags().String("branch", "", "Filter by branch name (@current for git HEAD branch)")
 	cmd.Flags().String("workflow", "", "Filter by workflow name")
 	cmd.Flags().String("status", "", "Filter by status: success, failed, error, running, aborted")
 	cmd.Flags().String("json", "", "Output JSON: comma-separated fields (e.g. status,buildNumber) or 'all'")
@@ -30,12 +31,16 @@ func init() {
 
 func runBuildList(cmd *cobra.Command, args []string) error {
 	limit, _ := cmd.Flags().GetInt("limit")
-	branch, _ := cmd.Flags().GetString("branch")
+	branchFlag, _ := cmd.Flags().GetString("branch")
 	workflow, _ := cmd.Flags().GetString("workflow")
 	statusFilter, _ := cmd.Flags().GetString("status")
 	jsonFields, _ := cmd.Flags().GetString("json")
 
 	// Validate input before any auth/network work.
+	branch, err := resolveBranchFilter(cmd.Context(), branchFlag)
+	if err != nil {
+		return err
+	}
 	status, err := parseStatusFilter(statusFilter)
 	if err != nil {
 		return err
