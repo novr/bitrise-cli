@@ -8,6 +8,18 @@ import (
 	"testing"
 )
 
+func chdirTo(t *testing.T, dir string) {
+	t.Helper()
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestResolveBranchFilterPassthrough(t *testing.T) {
 	got, err := resolveBranchFilter(context.Background(), "main")
 	if err != nil {
@@ -22,7 +34,7 @@ func TestResolveBranchFilterCurrent(t *testing.T) {
 	root := initTestGitRepo(t)
 	runGitInDir(t, root, "commit", "--allow-empty", "-m", "init")
 	runGitInDir(t, root, "checkout", "-b", "feature/foo")
-	t.Chdir(root)
+	chdirTo(t, root)
 
 	got, err := resolveBranchFilter(context.Background(), branchCurrent)
 	if err != nil {
@@ -36,7 +48,7 @@ func TestResolveBranchFilterCurrent(t *testing.T) {
 func TestResolveBranchFilterCurrentTrimmed(t *testing.T) {
 	root := initTestGitRepo(t)
 	runGitInDir(t, root, "commit", "--allow-empty", "-m", "init")
-	t.Chdir(root)
+	chdirTo(t, root)
 
 	got, err := resolveBranchFilter(context.Background(), "  @current  ")
 	if err != nil {
@@ -55,7 +67,7 @@ func TestResolveBranchFilterCurrentFromSubdir(t *testing.T) {
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(sub)
+	chdirTo(t, sub)
 
 	got, err := resolveBranchFilter(context.Background(), branchCurrent)
 	if err != nil {
@@ -70,7 +82,7 @@ func TestResolveBranchFilterDetachedHEAD(t *testing.T) {
 	root := initTestGitRepo(t)
 	runGitInDir(t, root, "commit", "--allow-empty", "-m", "init")
 	runGitInDir(t, root, "checkout", "--detach")
-	t.Chdir(root)
+	chdirTo(t, root)
 
 	_, err := resolveBranchFilter(context.Background(), branchCurrent)
 	if err == nil {
@@ -83,7 +95,7 @@ func TestResolveBranchFilterDetachedHEAD(t *testing.T) {
 
 func TestResolveBranchFilterNotGitRepo(t *testing.T) {
 	dir := t.TempDir()
-	t.Chdir(dir)
+	chdirTo(t, dir)
 
 	_, err := resolveBranchFilter(context.Background(), branchCurrent)
 	if err == nil {
