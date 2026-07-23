@@ -122,6 +122,7 @@ br build view 123
 ```bash
 br build logs 123               # full log
 br build logs 123 --failed-only # failed steps only
+br build logs 123 --json steps,failedStepLogs
 ```
 
 `--failed-only` is especially useful when asking Claude / Cursor to analyze logs and suggest fixes.

@@ -53,6 +53,8 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **`build list --branch @current`** (`cmd/build.go: currentGitBranch`) — Resolves via `git rev-parse --abbrev-ref HEAD` from the process cwd (git walks up to the repo root). Detached HEAD (`HEAD`) and non-repo directories error before auth/API. Whitespace around `@current` is trimmed.
 
+**`build logs --json`** (`cmd/build_logs.go`) — Structured log output with `steps` (`[{name, exitCode}]`) and `failedStepLogs` (`[{name, exitCode, body}]`). Mutually exclusive with `--failed-only`. `failedSteps` on view/watch is name-only summary; use `failedStepLogs` for raw step bodies. Parse failure: empty arrays + stderr (same message as `--failed-only`).
+
 **CI** — PRs run `go test` and actionlint. actionlint does not validate reusable-workflow inputs in external repos; verify release workflows with `workflow_dispatch` before tagging.
 
 ### Bitrise API

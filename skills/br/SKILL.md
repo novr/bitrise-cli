@@ -62,10 +62,11 @@ br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
 # 3. If still running — wait for completion
 br build watch <buildNumber> --exit-status --json status,buildNumber,failedSteps
 
-# 4. If failed — errors only (smaller than full log)
+# 4. If failed — structured step logs (agent) or raw errors only
+br build logs <buildNumber> --json steps,failedStepLogs
 br build logs <buildNumber> --failed-only
 
-# 5. Optional detail with failed steps (single object, not an array)
+# 5. Optional build metadata with failed step names (no log bodies)
 br build view <buildNumber> --json status,buildNumber,failedSteps
 ```
 
@@ -82,6 +83,8 @@ br build view <buildNumber> --json status,buildNumber,failedSteps
 **Build list fields:** `branch`, `buildNumber`, `commitHash`, `commitMessage`, `durationSeconds`, `finishedAt`, `slug`, `status`, `statusCode`, `triggeredAt`, `workflow` — or `all` / `*`.
 
 **Build view fields:** same as list plus `failedSteps` (`[{name, exitCode}]`). Log is fetched only when `failedSteps` is requested (or with `all`). Output is a single JSON object.
+
+**Build logs JSON fields:** `steps` (`[{name, exitCode}]`), `failedStepLogs` (`[{name, exitCode, body}]`) — or `all` / `*`. Mutually exclusive with `--failed-only`. `failedSteps` (view/watch) has no log bodies; use `failedStepLogs` here.
 
 **App list fields:** `repoURL`, `slug`, `title` — or `all` / `*`.
 
@@ -101,7 +104,7 @@ Unknown field names error with the valid list.
 | `br build list` | `--limit`, `--branch`, `--workflow`, `--status`, `--json` |
 | `br build watch <n>` | Poll until finished; `--exit-status`, `--json`, `--interval` |
 | `br build view <n>` | `--json`; includes `failedSteps` on failed builds |
-| `br build logs <n>` | Full log; `--failed-only` for failed steps |
+| `br build logs <n>` | Full log; `--failed-only` or `--json steps,failedStepLogs` |
 | `br app list` | Apps visible to the token; `--json` |
 | `br config show` | Token config + effective `.br.yml` |
 | `br doctor` | Diagnostics; non-zero exit on failure |
