@@ -125,6 +125,16 @@ br build logs 123 --failed-only # failed steps only
 
 `--failed-only` is especially useful when asking Claude / Cursor to analyze logs and suggest fixes.
 
+### Watch a running build
+
+```bash
+br build watch 123
+br build watch 123 --exit-status          # exit 1 on failure (for CI)
+br build watch 123 --json status,buildNumber,failedSteps
+```
+
+Polls until the build finishes. Use `--interval` (minimum `3s`) to control polling frequency.
+
 ### App list
 
 ```bash

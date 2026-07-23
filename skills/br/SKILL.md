@@ -56,10 +56,13 @@ br doctor --app <slug>         # override slug for diagnosis only
 # 1. Latest build (structured)
 br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
 
-# 2. If failed — errors only (smaller than full log)
+# 2. If still running — wait for completion
+br build watch <buildNumber> --exit-status --json status,buildNumber,failedSteps
+
+# 3. If failed — errors only (smaller than full log)
 br build logs <buildNumber> --failed-only
 
-# 3. Optional detail with failed steps (single object, not an array)
+# 4. Optional detail with failed steps (single object, not an array)
 br build view <buildNumber> --json status,buildNumber,failedSteps
 ```
 
@@ -93,6 +96,7 @@ Unknown field names error with the valid list.
 | Command | Notes |
 |---------|-------|
 | `br build list` | `--limit`, `--branch`, `--workflow`, `--status`, `--json` |
+| `br build watch <n>` | Poll until finished; `--exit-status`, `--json`, `--interval` |
 | `br build view <n>` | `--json`; includes `failedSteps` on failed builds |
 | `br build logs <n>` | Full log; `--failed-only` for failed steps |
 | `br app list` | Apps visible to the token; `--json` |
@@ -116,6 +120,6 @@ Global config stores **token only**; app slugs belong in `.br.yml` (commit for t
 - Run from the **target project directory** (or pass `--app` / set `BITRISE_APP_SLUG`).
 - Prefer `--failed-only` over full logs when analyzing failures.
 - `--failed-only` is **best-effort**: it parses Bitrise step headers. On parse failure, stderr says to re-run without the flag; empty output may mean no failures or an unparseable log format.
-- **Running builds:** `build logs` returns whatever log chunks exist so far (not a live stream). Re-run to refresh; partial output is prefixed when still running.
+- **Running builds:** use `br build watch <n>` to poll until finished (`--exit-status` for CI). With `--json`, poll output is discarded so stdout is only the final JSON object. `build logs` returns a snapshot (not a live stream).
 - `build view` and `--failed-only` share `parseLogSteps` — step names stay consistent.
 - Ctrl+C cancels in-flight API calls (`signal.NotifyContext` on root command).
