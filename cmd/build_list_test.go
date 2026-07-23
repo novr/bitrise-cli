@@ -48,14 +48,15 @@ func TestResolveBranchFilterCurrent(t *testing.T) {
 func TestResolveBranchFilterCurrentTrimmed(t *testing.T) {
 	root := initTestGitRepo(t)
 	runGitInDir(t, root, "commit", "--allow-empty", "-m", "init")
+	runGitInDir(t, root, "checkout", "-b", "trim-test")
 	chdirTo(t, root)
 
 	got, err := resolveBranchFilter(context.Background(), "  @current  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "main" {
-		t.Fatalf("got %q, want main", got)
+	if got != "trim-test" {
+		t.Fatalf("got %q, want trim-test", got)
 	}
 }
 
