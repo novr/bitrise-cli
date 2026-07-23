@@ -128,6 +128,7 @@ const branchCurrent = "@current"
 
 // resolveBranchFilter expands @current to the git HEAD branch name.
 func resolveBranchFilter(ctx context.Context, branch string) (string, error) {
+	branch = strings.TrimSpace(branch)
 	if branch != branchCurrent {
 		return branch, nil
 	}
@@ -140,6 +141,9 @@ func currentGitBranch(ctx context.Context) (string, error) {
 	gitCmd.Stderr = &stderr
 	out, err := gitCmd.Output()
 	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", fmt.Errorf("git not found in PATH: cannot resolve %s", branchCurrent)
+		}
 		if isBenignGitError(err, stderr.String()) {
 			return "", fmt.Errorf("not a git repository: cannot resolve %s", branchCurrent)
 		}

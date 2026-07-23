@@ -51,6 +51,8 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **`build watch`** (`cmd/build_watch.go`) — Polls `GetBuildByNumber` until status is no longer running. `--exit-status` returns an error (exit 1) on failure/aborted; default is false to match other read commands. Minimum `--interval` is 3s. With `--json`, poll output is discarded so stdout contains only the final JSON object.
 
+**`build list --branch @current`** (`cmd/build.go: currentGitBranch`) — Resolves via `git rev-parse --abbrev-ref HEAD` from the process cwd (git walks up to the repo root). Detached HEAD (`HEAD`) and non-repo directories error before auth/API. Whitespace around `@current` is trimmed.
+
 **CI** — PRs run `go test` and actionlint. actionlint does not validate reusable-workflow inputs in external repos; verify release workflows with `workflow_dispatch` before tagging.
 
 ### Bitrise API
