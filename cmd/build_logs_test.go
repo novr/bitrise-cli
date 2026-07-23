@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ func TestBuildLogsJSONAndFailedOnlyMutuallyExclusive(t *testing.T) {
 }
 
 func TestBuildLogsToFieldMap(t *testing.T) {
-	steps := parseLogSteps(readTestLog(t, "standard.log"))
+	steps := parseLogSteps(loadLogFixture(t, "standard.log"))
 	m := buildLogsToFieldMap(steps)
 
 	all, ok := m[fieldSteps].([]map[string]interface{})
@@ -52,12 +53,64 @@ func TestBuildLogsToFieldMap(t *testing.T) {
 
 func TestPrintBuildLogsJSONParseFailure(t *testing.T) {
 	stderr := captureStderr(t, func() {
-		if err := printBuildLogsJSON("plain text without step headers", map[string]bool{fieldSteps: true}); err != nil {
-			t.Fatal(err)
+		stdout := captureStdout(t, func() {
+			if err := printBuildLogsJSON("plain text without step headers", map[string]bool{fieldSteps: true}); err != nil {
+				t.Fatal(err)
+			}
+		})
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(stdout), &obj); err != nil {
+			t.Fatalf("stdout JSON: %v\n%s", err, stdout)
+		}
+		steps, _ := obj[fieldSteps].([]interface{})
+		if len(steps) != 0 {
+			t.Fatalf("steps = %#v, want empty array on parse failure", steps)
 		}
 	})
 	if !strings.Contains(stderr, parseLogStepsFailureMessage) {
 		t.Fatalf("stderr = %q, want parse failure message", stderr)
+	}
+}
+
+func TestPrintBuildLogsJSONEmptyLog(t *testing.T) {
+	stderr := captureStderr(t, func() {
+		stdout := captureStdout(t, func() {
+			if err := printBuildLogsJSON("", nil); err != nil {
+				t.Fatal(err)
+			}
+		})
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(stdout), &obj); err != nil {
+			t.Fatalf("stdout JSON: %v\n%s", err, stdout)
+		}
+		if steps, _ := obj[fieldSteps].([]interface{}); len(steps) != 0 {
+			t.Fatalf("steps = %#v, want empty", steps)
+		}
+		if failed, _ := obj[fieldFailedStepLogs].([]interface{}); len(failed) != 0 {
+			t.Fatalf("failedStepLogs = %#v, want empty", failed)
+		}
+	})
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty for empty log", stderr)
+	}
+}
+
+func TestPrintBuildLogsJSONFieldFilter(t *testing.T) {
+	logText := loadLogFixture(t, "standard.log")
+	stdout := captureStdout(t, func() {
+		if err := printBuildLogsJSON(logText, map[string]bool{fieldSteps: true}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &obj); err != nil {
+		t.Fatalf("stdout JSON: %v\n%s", err, stdout)
+	}
+	if _, ok := obj[fieldSteps]; !ok {
+		t.Fatalf("missing %q in %#v", fieldSteps, obj)
+	}
+	if _, ok := obj[fieldFailedStepLogs]; ok {
+		t.Fatalf("unexpected %q in filtered output: %#v", fieldFailedStepLogs, obj)
 	}
 }
 
@@ -72,15 +125,6 @@ func TestValidBuildLogsFields(t *testing.T) {
 			t.Fatalf("unexpected field %q", f)
 		}
 	}
-}
-
-func readTestLog(t *testing.T, name string) string {
-	t.Helper()
-	b, err := os.ReadFile("testdata/logs/" + name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
 }
 
 func captureStderr(t *testing.T, fn func()) string {

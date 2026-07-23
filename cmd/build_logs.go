@@ -104,7 +104,7 @@ func runBuildLogs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-const parseLogStepsFailureMessage = "Could not identify build steps in this log; re-run without --failed-only for the full output."
+const parseLogStepsFailureMessage = "Could not identify build steps in this log; re-run without --failed-only or --json for the full output."
 
 func buildLogsToFieldMap(steps []logStep) map[string]interface{} {
 	allSteps := make([]map[string]interface{}, 0, len(steps))
