@@ -56,10 +56,13 @@ br doctor --app <slug>         # override slug for diagnosis only
 # 1. Latest build (structured)
 br build list --limit 1 --json status,statusCode,buildNumber,branch,workflow
 
-# 2. If failed — errors only (smaller than full log)
+# 2. If still running — wait for completion
+br build watch <buildNumber> --exit-status --json status,buildNumber,failedSteps
+
+# 3. If failed — errors only (smaller than full log)
 br build logs <buildNumber> --failed-only
 
-# 3. Optional detail with failed steps (single object, not an array)
+# 4. Optional detail with failed steps (single object, not an array)
 br build view <buildNumber> --json status,buildNumber,failedSteps
 ```
 
@@ -93,6 +96,7 @@ Unknown field names error with the valid list.
 | Command | Notes |
 |---------|-------|
 | `br build list` | `--limit`, `--branch`, `--workflow`, `--status`, `--json` |
+| `br build watch <n>` | Poll until finished; `--exit-status`, `--json`, `--interval` |
 | `br build view <n>` | `--json`; includes `failedSteps` on failed builds |
 | `br build logs <n>` | Full log; `--failed-only` for failed steps |
 | `br app list` | Apps visible to the token; `--json` |

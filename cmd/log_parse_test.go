@@ -1,26 +1,24 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-const sampleLog = `
-+------------------------------------------------------------------------------+
-| (1) activate-ssh-key |
-+------------------------------------------------------------------------------+
-Running the step...
-Step succeeded
-
-+------------------------------------------------------------------------------+
-| (2) run-xcode-tests@2.4.1 |
-+------------------------------------------------------------------------------+
-Building for testing...
-error: test failed
-Exit code: 1
-`
+func loadLogFixture(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join("testdata", "logs", name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixture %s: %v", name, err)
+	}
+	return string(data)
+}
 
 func TestParseLogSteps(t *testing.T) {
+	sampleLog := loadLogFixture(t, "standard.log")
 	steps := parseLogSteps(sampleLog)
 	if len(steps) != 2 {
 		t.Fatalf("parseLogSteps found %d steps, want 2: %+v", len(steps), steps)
@@ -34,6 +32,7 @@ func TestParseLogSteps(t *testing.T) {
 }
 
 func TestFailedSteps(t *testing.T) {
+	sampleLog := loadLogFixture(t, "standard.log")
 	failed := failedSteps(parseLogSteps(sampleLog))
 	if len(failed) != 1 {
 		t.Fatalf("failedSteps returned %d, want 1", len(failed))
@@ -44,6 +43,7 @@ func TestFailedSteps(t *testing.T) {
 }
 
 func TestJoinStepBodies(t *testing.T) {
+	sampleLog := loadLogFixture(t, "standard.log")
 	out := joinStepBodies(failedSteps(parseLogSteps(sampleLog)))
 	if !strings.Contains(out, "run-xcode-tests@2.4.1") {
 		t.Errorf("output missing failing step name:\n%s", out)
@@ -121,44 +121,21 @@ exit code: 0
 // A log the parser cannot segment yields no steps (drives the --failed-only
 // "could not identify steps" branch).
 func TestParseLogStepsUnrecognized(t *testing.T) {
-	if steps := parseLogSteps("just some unstructured output\nwith no step headers\n"); len(steps) != 0 {
+	log := loadLogFixture(t, "no_step_headers.log")
+	if steps := parseLogSteps(log); len(steps) != 0 {
 		t.Errorf("got %d steps, want 0: %+v", len(steps), stepNames(steps))
 	}
 }
 
-// Mirrors real Bitrise log formatting (captured live from build #332):
-// wide padded step headers and the actual exit-code phrasings seen in the
-// wild ("Exit code:  65", "Bitrise build failed (exit code: 1)").
-func TestParseRealBitriseLogFormat(t *testing.T) {
-	const log = `
-+------------------------------------------------------------------------------+
-| (0) Xcode Test for iOS                                                       |
-+------------------------------------------------------------------------------+
-| id: xcode-test                                                               |
-+------------------------------------------------------------------------------+
-Running tests...
-** TEST FAILED **
-Exit code:  65
-Xcode Test command exit code: 65
-
-+------------------------------------------------------------------------------+
-| (1) Deploy to Bitrise.io                                                     |
-+------------------------------------------------------------------------------+
-Uploaded artifacts
-
-+------------------------------------------------------------------------------+
-| (2) Save Gradle Cache                                                        |
-+------------------------------------------------------------------------------+
-Collecting cache paths...
-Bitrise build failed (exit code: 1)
-`
-	steps := parseLogSteps(log)
+func TestParseLogStepsFixtures(t *testing.T) {
+	multiFailed := loadLogFixture(t, "multi_failed.log")
+	steps := parseLogSteps(multiFailed)
 	if len(steps) != 3 {
-		t.Fatalf("got %d steps, want 3: %v", len(steps), stepNames(steps))
+		t.Fatalf("multi_failed: got %d steps, want 3: %v", len(steps), stepNames(steps))
 	}
 	failed := failedSteps(steps)
 	if len(failed) != 2 {
-		t.Fatalf("got %d failed, want 2: %v", len(failed), stepNames(failed))
+		t.Fatalf("multi_failed: got %d failed, want 2: %v", len(failed), stepNames(failed))
 	}
 	if failed[0].Name != "Xcode Test for iOS" || failed[0].ExitCode != 65 {
 		t.Errorf("failed[0] = {%s, %d}, want {Xcode Test for iOS, 65}", failed[0].Name, failed[0].ExitCode)
