@@ -120,6 +120,6 @@ Global config stores **token only**; app slugs belong in `.br.yml` (commit for t
 - Run from the **target project directory** (or pass `--app` / set `BITRISE_APP_SLUG`).
 - Prefer `--failed-only` over full logs when analyzing failures.
 - `--failed-only` is **best-effort**: it parses Bitrise step headers. On parse failure, stderr says to re-run without the flag; empty output may mean no failures or an unparseable log format.
-- **Running builds:** `build logs` returns whatever log chunks exist so far (not a live stream). Re-run to refresh; partial output is prefixed when still running.
+- **Running builds:** use `br build watch <n>` to poll until finished (`--exit-status` for CI). With `--json`, poll output is discarded so stdout is only the final JSON object. `build logs` returns a snapshot (not a live stream).
 - `build view` and `--failed-only` share `parseLogSteps` — step names stay consistent.
 - Ctrl+C cancels in-flight API calls (`signal.NotifyContext` on root command).

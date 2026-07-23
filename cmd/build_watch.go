@@ -20,6 +20,11 @@ var getBuildForWatch = func(ctx context.Context, client *api.Client, appSlug str
 	return client.GetBuildByNumber(ctx, appSlug, buildNumber)
 }
 
+var (
+	newAPIClientForWatch   = newAPIClient
+	resolveAppSlugForWatch = resolveAppSlug
+)
+
 func init() {
 	cmd := &cobra.Command{
 		Use:   "watch <build-number>",
@@ -42,8 +47,8 @@ func runBuildWatch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid build number: %s", args[0])
 	}
 	interval, _ := cmd.Flags().GetDuration("interval")
-	if interval < minWatchInterval {
-		return fmt.Errorf("invalid --interval %s (minimum %s)", interval, minWatchInterval)
+	if err := validateWatchInterval(interval); err != nil {
+		return err
 	}
 	exitStatus, _ := cmd.Flags().GetBool("exit-status")
 	jsonFields, _ := cmd.Flags().GetString("json")
@@ -52,18 +57,22 @@ func runBuildWatch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newAPIClient()
+	client, err := newAPIClientForWatch()
 	if err != nil {
 		return err
 	}
 	ctx := cmd.Context()
-	appSlug, err := resolveAppSlug(ctx, cmd.Parent(), client)
+	appSlug, err := resolveAppSlugForWatch(ctx, cmd.Parent(), client)
 	if err != nil {
 		return err
 	}
 
-	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
-	build, err := watchBuild(ctx, client, appSlug, buildNumber, interval, cmd.OutOrStdout(), isTTY)
+	isTTY := isWriterTerminal(cmd.OutOrStdout()) && jsonFields == ""
+	watchOut := cmd.OutOrStdout()
+	if jsonFields != "" {
+		watchOut = io.Discard
+	}
+	build, err := watchBuild(ctx, client, appSlug, buildNumber, interval, watchOut, isTTY)
 	if err != nil {
 		return err
 	}
@@ -82,14 +91,36 @@ func runBuildWatch(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return buildWatchExitError(exitStatus, *build)
+}
+
+func buildWatchExitError(exitStatus bool, build api.Build) error {
 	if exitStatus && build.Status != api.StatusSuccess {
-		_, statusText := statusDisplay(*build)
+		_, statusText := statusDisplay(build)
 		return fmt.Errorf("build #%d finished with status %s", build.BuildNumber, statusText)
 	}
 	return nil
 }
 
+func validateWatchInterval(interval time.Duration) error {
+	if interval < minWatchInterval {
+		return fmt.Errorf("invalid --interval %s (minimum %s)", interval, minWatchInterval)
+	}
+	return nil
+}
+
+func isWriterTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
 func watchBuild(ctx context.Context, client *api.Client, appSlug string, buildNumber int, interval time.Duration, out io.Writer, isTTY bool) (*api.Build, error) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
 	for {
 		build, err := getBuildForWatch(ctx, client, appSlug, buildNumber)
 		if err != nil {
@@ -102,7 +133,7 @@ func watchBuild(ctx context.Context, client *api.Client, appSlug string, buildNu
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(interval):
+		case <-ticker.C:
 		}
 	}
 }
@@ -118,7 +149,7 @@ func printWatchStatus(out io.Writer, isTTY bool, build *api.Build) {
 	line := fmt.Sprintf("%s %s  #%d  %s  (branch: %s)  %s",
 		icon, statusText, build.BuildNumber, build.TriggeredWorkflow, build.Branch, timeStr)
 	if isTTY {
-		fmt.Fprintf(out, "\r%s", line)
+		fmt.Fprintf(out, "\r\033[K%s", line)
 	} else {
 		fmt.Fprintln(out, line)
 	}
