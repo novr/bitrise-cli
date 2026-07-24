@@ -55,6 +55,8 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **`build logs --json`** (`cmd/build_logs.go`) — Structured log output with `steps` (`[{name, exitCode}]`) and `failedStepLogs` (`[{name, exitCode, body}]`). Mutually exclusive with `--failed-only`. `failedSteps` on view/watch is name-only summary; use `failedStepLogs` for raw step bodies. Parse failure: empty arrays + stderr (same message as `--failed-only`).
 
+**GitHub Action** (`.github/actions/check/action.yml`) — Composite action wrapping `br build watch`. `build-number` is required; resolving the latest build by branch is rejected as unreliable (a newer unrelated build would pass the gate). Installs the release binary by `RUNNER_OS`/`RUNNER_ARCH` (Linux amd64/arm64, macOS universal); `version` defaults to the latest release tag (no floating `latest`). Empty `app` input is safe — `resolveAppSlug` treats an empty `BITRISE_APP_SLUG` as unset and falls through to `.br.yml`/git remote. actionlint does not lint composite actions, so scripts are verified with shellcheck.
+
 **CI** — PRs run `go test` and actionlint. actionlint does not validate reusable-workflow inputs in external repos; verify release workflows with `workflow_dispatch` before tagging.
 
 ### Bitrise API

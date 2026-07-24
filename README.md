@@ -137,6 +137,23 @@ br build watch 123 --json status,buildNumber,failedSteps
 
 Polls until the build finishes. Use `--interval` (minimum `3s`) to control polling frequency.
 
+### GitHub Action
+
+Gate a workflow on a Bitrise build with the bundled composite action. `build-number` is required — resolving "the latest build" by branch is unreliable and can pass on an unrelated build.
+
+```yaml
+- uses: novr/bitrise-cli/.github/actions/check@v0.2.0
+  with:
+    token: ${{ secrets.BITRISE_API_TOKEN }}
+    build-number: ${{ needs.trigger.outputs.build-number }}
+    app: <app-slug>          # optional; falls back to .br.yml / git remote
+    version: v0.2.0          # optional; defaults to the latest release tag
+    exit-status: "true"      # optional; fail the step on non-success (default)
+    interval: "5s"           # optional; minimum 3s
+```
+
+The action downloads the matching `br` release binary (Linux amd64/arm64, macOS universal) and runs `br build watch <n> --exit-status --json …`.
+
 ### App list
 
 ```bash

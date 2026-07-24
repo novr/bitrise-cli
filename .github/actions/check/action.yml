@@ -1,0 +1,100 @@
+name: "Check Bitrise build"
+description: "Wait for a Bitrise build to finish using the br CLI and fail the job when the build does not succeed."
+
+inputs:
+  token:
+    description: "Bitrise API token (personal or workspace)."
+    required: true
+  build-number:
+    description: "Build number to watch. Required — resolving the latest build by branch is unreliable."
+    required: true
+  app:
+    description: "Bitrise app slug. Optional; falls back to .br.yml or the git remote when omitted."
+    required: false
+    default: ""
+  version:
+    description: "br release version to install (e.g. v0.2.0). Defaults to the latest published release tag."
+    required: false
+    default: ""
+  exit-status:
+    description: "Fail the step when the build is not successful."
+    required: false
+    default: "true"
+  interval:
+    description: "Polling interval while the build runs (minimum 3s)."
+    required: false
+    default: "5s"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install br
+      shell: bash
+      env:
+        BR_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        repo="novr/bitrise-cli"
+        version="${BR_VERSION#v}"
+        if [[ -z "${version}" ]]; then
+          tag="$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
+            | grep '"tag_name"' | head -1 | cut -d '"' -f4)"
+          if [[ -z "${tag}" ]]; then
+            echo "::error::Could not resolve the latest br release tag."
+            exit 1
+          fi
+          version="${tag#v}"
+        fi
+        tag="v${version}"
+
+        case "${RUNNER_OS}" in
+          Linux)
+            case "${RUNNER_ARCH}" in
+              X64) arch="amd64" ;;
+              ARM64) arch="arm64" ;;
+              *) echo "::error::Unsupported runner arch ${RUNNER_ARCH} on Linux."; exit 1 ;;
+            esac
+            asset="br_${version}_linux_${arch}.tar.gz"
+            ;;
+          macOS)
+            asset="br_${version}_darwin.tar.gz"
+            ;;
+          *)
+            echo "::error::Unsupported runner OS ${RUNNER_OS}."
+            exit 1
+            ;;
+        esac
+
+        url="https://github.com/${repo}/releases/download/${tag}/${asset}"
+        echo "Installing br ${tag} from ${url}"
+
+        tmp="$(mktemp -d)"
+        curl -fsSL "${url}" -o "${tmp}/br.tar.gz"
+        tar -C "${tmp}" -xzf "${tmp}/br.tar.gz" br
+        chmod +x "${tmp}/br"
+        echo "${tmp}" >> "${GITHUB_PATH}"
+
+    - name: Watch build
+      shell: bash
+      env:
+        BITRISE_API_TOKEN: ${{ inputs.token }}
+        BITRISE_APP_SLUG: ${{ inputs.app }}
+        BR_BUILD_NUMBER: ${{ inputs.build-number }}
+        BR_EXIT_STATUS: ${{ inputs.exit-status }}
+        BR_INTERVAL: ${{ inputs.interval }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${BR_BUILD_NUMBER}" ]]; then
+          echo "::error::build-number is required."
+          exit 1
+        fi
+
+        fields="status,buildNumber,statusCode,failedSteps"
+        args=("${BR_BUILD_NUMBER}" --interval "${BR_INTERVAL}" --json "${fields}")
+        if [[ "${BR_EXIT_STATUS}" == "true" ]]; then
+          args+=(--exit-status)
+        fi
+
+        br build watch "${args[@]}"
