@@ -56,6 +56,8 @@ Environment variables take precedence (no `br auth login` required). Use `BITRIS
 export BITRISE_API_TOKEN=<your-token>
 ```
 
+To isolate multiple Bitrise accounts without built-in profiles, set `BR_CONFIG_DIR` (see [Config files](#config-files)).
+
 ## Usage
 
 ### List builds
@@ -237,10 +239,25 @@ br build logs 123 --failed-only
 
 ## Config files
 
-`~/.config/br/config.yml` stores the token only. App slugs live in project `.br.yml` (commit recommended for team sharing and monorepo switching).
+Global config path resolution:
+
+1. `BR_CONFIG_DIR` (empty string is treated as unset)
+2. Default `~/.config/br` (`$HOME/.config/br`)
+
+The global `config.yml` in that directory stores the token only. App slugs live in project `.br.yml` (commit recommended for team sharing and monorepo switching).
 
 ```yaml
 token: <your-token>
+```
+
+Switch configs per project with `direnv` (or any env manager). Relative `BR_CONFIG_DIR` values are resolved from the process working directory at startup.
+
+```bash
+# .envrc
+export BR_CONFIG_DIR="$HOME/.config/br-work"
+
+BR_CONFIG_DIR="$HOME/.config/br-work" br auth login
+BR_CONFIG_DIR="$HOME/.config/br-personal" br auth status
 ```
 
 > **Security note**: Tokens are stored in plain text with mode `0600` (owner read/write only). Like `gh`, there is no OS keychain encryption. On shared machines, prefer the `BITRISE_API_TOKEN` environment variable.

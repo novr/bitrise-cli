@@ -71,7 +71,10 @@ func runConfigSetApp(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigShow(cmd *cobra.Command, args []string) error {
-	path, _ := config.Path()
+	path, err := config.Path()
+	if err != nil {
+		return err
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		return err

@@ -49,7 +49,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if slug, ok, err := config.DeprecatedDefaultAppValue(); err != nil {
 		return err
 	} else if ok {
-		fmt.Println("⚠ warning: config.yml contains deprecated default_app (ignored); remove it")
+		path, err := config.Path()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("⚠ warning: %s contains deprecated default_app (ignored); remove it\n", path)
 		fmt.Printf("  tip: run br config set app %s in your project directory\n", slug)
 	}
 
