@@ -39,7 +39,7 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **Local config** (`internal/config/local.go`) — `app` only; empty/whitespace skips to parent. Outside git, only cwd is checked so parent directories cannot leak in. `br doctor` probes git even when `.br.yml` wins, to warn on slug/git mismatch without affecting normal commands.
 
-**Token resolution** (`internal/config/config.go: GetToken`) — Env vars beat stored config for CI/scripts. Workspace tokens (`bitwat_…`) 404 on `/me*`, so validation uses `GET /apps?limit=1` (`Client.Verify`).
+**Token resolution** (`internal/config/config.go: GetToken`) — Env vars beat stored config for CI/scripts. Global config path: non-empty `BR_CONFIG_DIR` → `$HOME/.config/br` (`configPath`). Workspace tokens (`bitwat_…`) 404 on `/me*`, so validation uses `GET /apps?limit=1` (`Client.Verify`).
 
 **Build status** (`internal/api: BuildStatus`) — Named constants (`StatusRunning=0 … StatusAborted=3`); never compare bare ints. Filters use `*BuildStatus` (nil = no filter).
 

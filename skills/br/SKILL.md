@@ -20,12 +20,16 @@ go install github.com/novr/bitrise-cli/cmd/br@latest
 
 Linux: download from [GitHub Releases](https://github.com/novr/bitrise-cli/releases).
 
-**Auth** — env vars beat `~/.config/br/config.yml`:
+**Auth** — env vars beat stored config. Override the config directory with `BR_CONFIG_DIR` (empty = unset; default `$HOME/.config/br`):
 
 ```bash
 export BITRISE_API_TOKEN=<token>   # preferred; BITRISE_TOKEN also works
 echo "$BITRISE_API_TOKEN" | br auth login --with-token   # CI / scripts
 br auth status
+
+# isolate accounts without profiles (direnv, etc.)
+# .envrc: export BR_CONFIG_DIR="$HOME/.config/br-work"
+export BR_CONFIG_DIR="$HOME/.config/br-work"
 ```
 
 Token: [Bitrise Personal Access Token](https://app.bitrise.io/me/profile#/security). Workspace API tokens work; `br auth login` greeting may skip `/me` but `Client.Verify` uses `GET /apps?limit=1`.
@@ -119,7 +123,7 @@ app: <app-slug>
 
 Discovery walks up to **git root** (not `bitrise.yml`). Subpackages can override with a nearer `.br.yml`. `br doctor` warns when `.br.yml` slug disagrees with git-detected slug.
 
-Global config stores **token only**; app slugs belong in `.br.yml` (commit for team sharing).
+Global config stores **token only**; app slugs belong in `.br.yml` (commit for team sharing). Do not add token or profile fields to `.br.yml`.
 
 ## Agent tips
 

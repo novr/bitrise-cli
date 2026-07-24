@@ -13,6 +13,13 @@ type Config struct {
 }
 
 func configPath() (string, error) {
+	if dir := os.Getenv("BR_CONFIG_DIR"); dir != "" {
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(abs, "config.yml"), nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
