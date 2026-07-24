@@ -49,11 +49,13 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **Log fetching** (`internal/api/client.go: FetchLog`) — Archived builds expose `expiring_raw_log_url`; running builds stream `log_chunks`. Both paths must work for AI assistants polling in-progress builds.
 
-**`build watch`** (`cmd/build_watch.go`) — Polls `GetBuildByNumber` until status is no longer running. `--exit-status` returns an error (exit 1) on failure/aborted; default is false to match other read commands. Minimum `--interval` is 3s. With `--json`, poll output is discarded so stdout contains only the final JSON object.
+**`build watch`** (`cmd/build_watch.go`) — Polls `GetBuildByNumber` until status is no longer running. `--exit-status` returns an error (exit 1) on failure/aborted; default is false to match other read commands. Minimum `--interval` is 3s. With `--json`, poll output is discarded so stdout contains only the final JSON object — but `--exit-status` is still honored (JSON goes to stdout, the exit-1 error goes to stderr), so the GitHub Action can gate CI while emitting structured output.
 
 **`build list --branch @current`** (`cmd/build.go: currentGitBranch`) — Resolves via `git rev-parse --abbrev-ref HEAD` from the process cwd (git walks up to the repo root). Detached HEAD (`HEAD`) and non-repo directories error before auth/API. Whitespace around `@current` is trimmed.
 
 **`build logs --json`** (`cmd/build_logs.go`) — Structured log output with `steps` (`[{name, exitCode}]`) and `failedStepLogs` (`[{name, exitCode, body}]`). Mutually exclusive with `--failed-only`. `failedSteps` on view/watch is name-only summary; use `failedStepLogs` for raw step bodies. Parse failure: empty arrays + stderr (same message as `--failed-only`).
+
+**GitHub Action** (`.github/actions/check/action.yml`) — Composite action wrapping `br build watch`. `build-number` is required; resolving the latest build by branch is rejected as unreliable (a newer unrelated build would pass the gate). Installs the release binary by `RUNNER_OS`/`RUNNER_ARCH` (Linux amd64/arm64, macOS universal); `version` defaults to the latest release tag (no floating `latest`). Empty `app` input is safe — `resolveAppSlug` treats an empty `BITRISE_APP_SLUG` as unset and falls through to `.br.yml`/git remote. actionlint does not lint composite actions, so scripts are verified with shellcheck.
 
 **CI** — PRs run `go test` and actionlint. actionlint does not validate reusable-workflow inputs in external repos; verify release workflows with `workflow_dispatch` before tagging.
 
