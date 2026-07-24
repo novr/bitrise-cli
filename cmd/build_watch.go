@@ -79,7 +79,12 @@ func runBuildWatch(cmd *cobra.Command, args []string) error {
 
 	if jsonFields != "" {
 		failed := failedStepsForView(ctx, client, appSlug, build, requestedFields)
-		return printJSONObject(buildViewToFieldMap(*build, failed), requestedFields)
+		if err := printJSONObject(buildViewToFieldMap(*build, failed), requestedFields); err != nil {
+			return err
+		}
+		// --exit-status must still fail the process so CI gates work when --json
+		// is combined with it; the JSON already went to stdout above.
+		return buildWatchExitError(exitStatus, *build)
 	}
 
 	if isTTY {

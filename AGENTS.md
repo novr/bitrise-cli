@@ -49,7 +49,7 @@ Git root caps `.br.yml` walk (not `bitrise.yml`) because Bitrise monorepos typic
 
 **Log fetching** (`internal/api/client.go: FetchLog`) — Archived builds expose `expiring_raw_log_url`; running builds stream `log_chunks`. Both paths must work for AI assistants polling in-progress builds.
 
-**`build watch`** (`cmd/build_watch.go`) — Polls `GetBuildByNumber` until status is no longer running. `--exit-status` returns an error (exit 1) on failure/aborted; default is false to match other read commands. Minimum `--interval` is 3s. With `--json`, poll output is discarded so stdout contains only the final JSON object.
+**`build watch`** (`cmd/build_watch.go`) — Polls `GetBuildByNumber` until status is no longer running. `--exit-status` returns an error (exit 1) on failure/aborted; default is false to match other read commands. Minimum `--interval` is 3s. With `--json`, poll output is discarded so stdout contains only the final JSON object — but `--exit-status` is still honored (JSON goes to stdout, the exit-1 error goes to stderr), so the GitHub Action can gate CI while emitting structured output.
 
 **`build list --branch @current`** (`cmd/build.go: currentGitBranch`) — Resolves via `git rev-parse --abbrev-ref HEAD` from the process cwd (git walks up to the repo root). Detached HEAD (`HEAD`) and non-repo directories error before auth/API. Whitespace around `@current` is trimmed.
 

@@ -70,7 +70,22 @@ runs:
         echo "Installing br ${tag} from ${url}"
 
         tmp="$(mktemp -d)"
-        curl -fsSL "${url}" -o "${tmp}/br.tar.gz"
+        # Release assets are uploaded across several jobs (Linux tarballs land
+        # after the release is created), so the asset can 404 briefly right
+        # after a new tag. Retry with backoff instead of failing immediately.
+        attempts=5
+        for i in $(seq 1 "${attempts}"); do
+          if curl -fsSL "${url}" -o "${tmp}/br.tar.gz"; then
+            break
+          fi
+          if [[ "${i}" -eq "${attempts}" ]]; then
+            echo "::error::Failed to download ${asset} from ${url} after ${attempts} attempts."
+            exit 1
+          fi
+          echo "Download failed (attempt ${i}/${attempts}); retrying in $((i * 5))s..."
+          sleep "$((i * 5))"
+        done
+
         tar -C "${tmp}" -xzf "${tmp}/br.tar.gz" br
         chmod +x "${tmp}/br"
         echo "${tmp}" >> "${GITHUB_PATH}"

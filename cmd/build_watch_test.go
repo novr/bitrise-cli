@@ -191,6 +191,48 @@ func TestRunBuildWatchJSONSkipsPollOutput(t *testing.T) {
 	}
 }
 
+func TestRunBuildWatchJSONHonorsExitStatus(t *testing.T) {
+	build := &api.Build{
+		BuildNumber:       8,
+		Branch:            "main",
+		TriggeredWorkflow: "primary",
+		Status:            api.StatusError,
+		StatusText:        "error",
+	}
+	orig := getBuildForWatch
+	getBuildForWatch = func(ctx context.Context, client *api.Client, appSlug string, buildNumber int) (*api.Build, error) {
+		return build, nil
+	}
+	t.Cleanup(func() { getBuildForWatch = orig })
+
+	origResolve := resolveAppSlugForWatch
+	resolveAppSlugForWatch = func(ctx context.Context, cmd *cobra.Command, client *api.Client) (string, error) {
+		return "test-app", nil
+	}
+	t.Cleanup(func() { resolveAppSlugForWatch = origResolve })
+
+	origClient := newAPIClientForWatch
+	newAPIClientForWatch = func() (*api.Client, error) {
+		return api.NewClient("test-token"), nil
+	}
+	t.Cleanup(func() { newAPIClientForWatch = origClient })
+
+	var err error
+	out := captureStdout(t, func() {
+		err = executeBuildWatch(t, "8", "--app", "test-app", "--interval", "5s", "--exit-status", "--json", "status,buildNumber,statusCode")
+	})
+	if err == nil {
+		t.Fatal("expected error from --exit-status on failed build with --json")
+	}
+	var row map[string]interface{}
+	if jerr := json.Unmarshal([]byte(strings.TrimSpace(out)), &row); jerr != nil {
+		t.Fatalf("stdout is not valid JSON: %v\n%s", jerr, out)
+	}
+	if row["buildNumber"] != float64(8) {
+		t.Fatalf("buildNumber = %v, want 8", row["buildNumber"])
+	}
+}
+
 func TestIsWriterTerminal(t *testing.T) {
 	if isWriterTerminal(&bytes.Buffer{}) {
 		t.Error("bytes.Buffer should not be a terminal")
